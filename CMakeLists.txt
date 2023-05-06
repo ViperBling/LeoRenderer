@@ -3,7 +3,7 @@ cmake_policy(VERSION 2.8)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
 
 set(NAME LeoRenderer)
-project(NAME)
+project(${NAME})
 
 include_directories(External)
 include_directories(External/GLM)
