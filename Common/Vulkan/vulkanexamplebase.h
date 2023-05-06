@@ -31,10 +31,10 @@
 #include <xcb/xcb.h>
 #endif
 
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include <string>
+#include <cassert>
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -57,7 +57,7 @@
 #include <numeric>
 #include <array>
 
-#include "vulkan/vulkan.h"
+#include "Vulkan/vulkan.h"
 
 #include "CommandLineParser.hpp"
 #include "keycodes.hpp"
@@ -91,7 +91,7 @@ private:
 	void setupSwapChain();
 	void createCommandBuffers();
 	void destroyCommandBuffers();
-	std::string shaderDir = "glsl";
+	std::string shaderDir = "GLSL";
 protected:
 	// Returns the path to the root of the glsl or hlsl shader directory.
 	std::string getShadersPath() const;
@@ -201,7 +201,7 @@ public:
 
 	std::string title = "Vulkan Example";
 	std::string name = "vulkanExample";
-	uint32_t apiVersion = VK_API_VERSION_1_0;
+	uint32_t apiVersion = VK_API_VERSION_1_2;
 
 	struct {
 		VkImage image;
@@ -272,7 +272,7 @@ public:
 	bool quit = false;
 #endif
 
-	VulkanExampleBase(bool enableValidation = false);
+	explicit VulkanExampleBase(bool enableValidation = false);
 	virtual ~VulkanExampleBase();
 	/** @brief Setup the vulkan instance, enable required extensions and connect to the physical device (GPU) */
 	bool initVulkan();
@@ -381,7 +381,7 @@ public:
 	void renderLoop();
 
 	/** @brief Adds the drawing commands for the ImGui overlay to the given command buffer */
-	void drawUI(const VkCommandBuffer commandBuffer);
+	void drawUI(VkCommandBuffer commandBuffer);
 
 	/** Prepare the next frame for workload submission by acquiring the next swap chain image */
 	void prepareFrame();

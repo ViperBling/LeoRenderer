@@ -12,7 +12,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
 #include <vulkan/vulkan.h>
 #include "vulkanexamplebase.h"
 
@@ -50,4 +49,16 @@ struct UniformBufferObject
     glm::mat4 projectionMat;
     glm::mat4 modelMat;
     glm::mat4 viewMat;
+};
+
+struct StagingBuffer
+{
+    VkDeviceMemory memory;
+    VkBuffer buffer;
+};
+
+struct StagingBuffers
+{
+    StagingBuffer vertices;
+    StagingBuffer indices;
 };
