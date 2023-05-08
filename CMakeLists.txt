@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
-cmake_policy(VERSION 2.8)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
 
 set(NAME LeoRenderer)
@@ -11,6 +11,7 @@ include_directories(External/ImGui)
 include_directories(External/TinyGLTF)
 include_directories(External/KTX/include)
 include_directories(External/KTX/other_include)
+include_directories(Common)
 include_directories(Common/Vulkan)
 
 OPTION(USE_D2D_WSI "Build the project using Direct to Display swapchain" OFF)
@@ -42,7 +43,7 @@ ENDIF()
 IF (NOT Vulkan_FOUND)
     message(FATAL_ERROR "Could not find Vulkan library!")
 ELSE()
-    message(STATUS ${Vulkan_LIBRARY})
+    message(STATUS "Found Vulkna in: " ${Vulkan_LIBRARY})
 ENDIF()
 
 # Set preprocessor defines
@@ -79,14 +80,6 @@ IF(MSVC)
 ELSEIF(APPLE)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fobjc-arc -xobjective-c++")
 ENDIF(MSVC)
-
-IF(WIN32)
-    # Nothing here (yet)
-ELSEIF(APPLE)
-    link_libraries(${Vulkan_LIBRARY} "-framework AppKit" "-framework QuartzCore")
-ELSE(WIN32)
-    link_libraries(${XCB_LIBRARIES} ${Vulkan_LIBRARY} ${Vulkan_LIBRARY} ${DIRECTFB_LIBRARIES} ${WAYLAND_CLIENT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-ENDIF(WIN32)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Bin/")
 

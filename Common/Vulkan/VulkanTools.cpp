@@ -17,7 +17,7 @@ const std::string getAssetPath()
 #elif defined(VK_EXAMPLE_DATA_DIR)
 	return VK_EXAMPLE_DATA_DIR;
 #else
-	return "./../Assets/";
+	return "./../../../Assets/";
 #endif
 }
 #endif
@@ -307,7 +307,7 @@ namespace vks
 		{
 #if defined(_WIN32)
 			if (!errorModeSilent) {
-				MessageBox(NULL, message.c_str(), NULL, MB_OK | MB_ICONERROR);
+				MessageBox(nullptr, message.c_str(), nullptr, MB_OK | MB_ICONERROR);
 			}
 #elif defined(__ANDROID__)
             LOGE("Fatal error: %s", message.c_str());
@@ -363,7 +363,7 @@ namespace vks
 				size_t size = is.tellg();
 				is.seekg(0, std::ios::beg);
 				char* shaderCode = new char[size];
-				is.read(shaderCode, size);
+				is.read(shaderCode, (long long)size);
 				is.close();
 
 				assert(size > 0);
@@ -374,7 +374,7 @@ namespace vks
 				moduleCreateInfo.codeSize = size;
 				moduleCreateInfo.pCode = (uint32_t*)shaderCode;
 
-				VK_CHECK_RESULT(vkCreateShaderModule(device, &moduleCreateInfo, NULL, &shaderModule));
+				VK_CHECK_RESULT(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule));
 
 				delete[] shaderCode;
 

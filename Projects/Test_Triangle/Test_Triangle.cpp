@@ -51,10 +51,10 @@ public:
         prepareSyncPrimtives();
         prepareVertices(USE_STAGING);
         prepareUniformBuffers();
-        createDescriptorSetLayout();
+        setupDescriptorSetLayout();
         preparePipelines();
-        createDescriptorPool();
-        createDescriptorSet();
+        setupDescriptorPool();
+        setupDescriptorSet();
         buildCommandBuffers();
         prepared = true;
     }
@@ -408,7 +408,7 @@ public:
         }
     }
 
-    void createDescriptorPool()
+    void setupDescriptorPool()
     {
         // 需要告诉Vulkan用的Descriptor的数量
         VkDescriptorPoolSize typeCounts[1];
@@ -431,7 +431,7 @@ public:
         VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCI, nullptr, &descriptorPool));
     }
 
-    void createDescriptorSetLayout()
+    void setupDescriptorSetLayout()
     {
         // 连接不同管线阶段到描述符，具有唯一性
         VkDescriptorSetLayoutBinding layoutBinding = {};
@@ -458,7 +458,7 @@ public:
         VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
     }
 
-    void createDescriptorSet()
+    void setupDescriptorSet()
     {
         // 从描述符池中分配一个描述符集
         VkDescriptorSetAllocateInfo descriptorSetAI{};
@@ -476,6 +476,7 @@ public:
         writeDescriptorSet.dstSet = descriptorSet;
         writeDescriptorSet.descriptorCount = 1;
         writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescriptorSet.pBufferInfo = &uniformBuffer.descriptor;
         // 绑定0号点
         writeDescriptorSet.dstBinding = 0;
         vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
@@ -775,7 +776,7 @@ public:
         // Set pipeline stage for this shader
         shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
         // Load binary SPIR-V shader
-        shaderStages[0].module = loadSPIRVShader(getShadersPath() + "TestTriangle/TestTriangle.vert.spv");
+        shaderStages[0].module = loadSPIRVShader(getShadersPath() + "TestTriangle/TestTriangleGLSL.vert.spv");
         // Main entry point for the shader
         shaderStages[0].pName = "main";
         assert(shaderStages[0].module != VK_NULL_HANDLE);
@@ -785,7 +786,7 @@ public:
         // Set pipeline stage for this shader
         shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         // Load binary SPIR-V shader
-        shaderStages[1].module = loadSPIRVShader(getShadersPath() + "TestTriangle/TestTriangle.frag.spv");
+        shaderStages[1].module = loadSPIRVShader(getShadersPath() + "TestTriangle/TestTriangleGLSL.frag.spv");
         // Main entry point for the shader
         shaderStages[1].pName = "main";
         assert(shaderStages[1].module != VK_NULL_HANDLE);
@@ -892,7 +893,7 @@ TestTriangle* testTriangle;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    if (testTriangle != NULL)
+    if (testTriangle != nullptr)
     {
         testTriangle->handleMessages(hWnd, uMsg, wParam, lParam);
     }

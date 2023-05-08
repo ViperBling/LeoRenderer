@@ -769,7 +769,7 @@ VulkanExampleBase::VulkanExampleBase(bool enableValidation)
 	{
 #if defined(_WIN32)
 		std::string msg = "Could not locate asset path in \"" + getAssetPath() + "\" !";
-		MessageBox(NULL, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
+		MessageBox(nullptr, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
 #else
 		std::cerr << "Error: Could not find asset path in " << getAssetPath() << "\n";
 #endif
@@ -1602,7 +1602,7 @@ dispatch_group_t concurrentGroup;
 @end
 
 const std::string getAssetPath() {
-    return [NSBundle.mainBundle.resourcePath stringByAppendingString: @"/../../data/"].UTF8String;
+    return [NSBundle.mainBundle.resourcePath stringByAppendingString: @"/../../Assets/"].UTF8String;
 }
 
 static CVReturn displayLinkOutputCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow,
