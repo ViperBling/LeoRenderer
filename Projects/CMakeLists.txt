@@ -49,6 +49,7 @@ endfunction(buildProjects)
 set(PROJECTS
 #    VulkanRenderer
     Test_Triangle
+    Test_GLTFLoader
     )
 
 buildProjects()
