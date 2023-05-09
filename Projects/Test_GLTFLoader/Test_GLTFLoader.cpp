@@ -376,7 +376,7 @@ void TestGLTFLoader::LoadGLTFFile(const std::string filename)
 
 void TestGLTFLoader::LoadAssets()
 {
-    LoadGLTFFile(getAssetPath() + "Models/BusterDrone/busterDrone.gltf");
+    LoadGLTFFile(getAssetPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
 }
 
 void TestGLTFLoader::getEnabledFeatures()

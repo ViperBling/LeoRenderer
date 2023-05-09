@@ -88,7 +88,7 @@ struct ShaderData
     struct Values {
         glm::mat4 projectMat;
         glm::mat4 viewMat;
-        glm::vec4 lightPos = glm::vec4(0.0f, 2.5f, 0.0f, 1.0f);
+        glm::vec4 lightPos = glm::vec4(0.0f, 5.0f, -5.0f, 1.0f);
         glm::vec4 viewPos;
     } values;
 };
