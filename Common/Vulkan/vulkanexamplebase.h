@@ -32,7 +32,7 @@
 #endif
 
 #include <iostream>
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
 #include <cassert>
 #include <vector>
@@ -72,6 +72,8 @@
 #include "VulkanInitializers.hpp"
 #include "camera.hpp"
 #include "benchmark.hpp"
+
+//#define VK_EXAMPLE_DATA_DIR "../../../Assets"
 
 class VulkanExampleBase
 {

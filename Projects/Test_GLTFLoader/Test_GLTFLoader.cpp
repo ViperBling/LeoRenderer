@@ -18,13 +18,13 @@ VulkanGLTFLoader::~VulkanGLTFLoader()
     }
 }
 
-void VulkanGLTFLoader::LoadImages(tinygltf::Model &input)
+void VulkanGLTFLoader::LoadImages(tinygltf::Model& input)
 {
     images.resize(input.images.size());
     for (size_t i = 0; i < input.images.size(); i++)
     {
         tinygltf::Image& glTFImage = input.images[i];
-        unsigned char* buffer{};
+        unsigned char* buffer = nullptr;
         VkDeviceSize bufferSize = 0;
         bool deleteBuffer = false;
         // 把RGB图像转换成RGBA，大多数设备的Vulkan不支持RGB
@@ -35,7 +35,7 @@ void VulkanGLTFLoader::LoadImages(tinygltf::Model &input)
             unsigned char* rgba = buffer;
             unsigned char* rgb = &glTFImage.image[0];
 
-            for (size_t j = 0; i < glTFImage.width * glTFImage.height; j++)
+            for (size_t j = 0; j < glTFImage.width * glTFImage.height; j++)
             {
                 memcpy(rgba, rgb, sizeof(unsigned char) * 3);
                 rgba += 4;
@@ -285,7 +285,7 @@ TestGLTFLoader::~TestGLTFLoader()
     shaderData.buffer.destroy();
 }
 
-void TestGLTFLoader::LoadGLTFFile(std::string filename)
+void TestGLTFLoader::LoadGLTFFile(const std::string filename)
 {
     tinygltf::Model glTFInput;
     tinygltf::TinyGLTF glTFContext;
@@ -322,7 +322,7 @@ void TestGLTFLoader::LoadGLTFFile(std::string filename)
 
     size_t vertexBufferSize = vertexBuffer.size() * sizeof(Vertex);
     size_t indexBufferSize = indexBuffer.size() * sizeof(uint32_t);
-    glTFModel.indices.count = static_cast<uint32_t>(indexBuffer.size());
+    glTFModel.indices.count = static_cast<int32_t>(indexBuffer.size());
 
     StagingBuffer vertexStaging{}, indexStaging{};
 
@@ -386,7 +386,41 @@ void TestGLTFLoader::getEnabledFeatures()
 
 void TestGLTFLoader::buildCommandBuffers()
 {
-    VulkanExampleBase::buildCommandBuffers();
+    VkCommandBufferBeginInfo cmdBufferBI = vks::initializers::commandBufferBeginInfo();
+
+    VkClearValue clearValues[2];
+    clearValues[0].color = defaultClearColor;
+    clearValues[0].color = { { 0.25f, 0.25f, 0.25f, 1.0f } };;
+    clearValues[1].depthStencil = { 1.0f, 0 };
+
+    VkRenderPassBeginInfo renderPassBI = vks::initializers::renderPassBeginInfo();
+    renderPassBI.renderPass = renderPass;
+    renderPassBI.renderArea.offset.x = 0;
+    renderPassBI.renderArea.offset.y = 0;
+    renderPassBI.renderArea.extent.width = width;
+    renderPassBI.renderArea.extent.height = height;
+    renderPassBI.clearValueCount = 2;
+    renderPassBI.pClearValues = clearValues;
+
+    const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+    const VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+
+    for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+    {
+        renderPassBI.framebuffer = frameBuffers[i];
+
+        VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufferBI));
+        vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBI, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+        vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+        // Bind scene matrices descriptor to set 0
+        vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+        vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrame ? pipelines.wireFrame : pipelines.solid);
+        glTFModel.Draw(drawCmdBuffers[i], pipelineLayout);
+        drawUI(drawCmdBuffers[i]);
+        vkCmdEndRenderPass(drawCmdBuffers[i]);
+        VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+    }
 }
 
 void TestGLTFLoader::SetupDescriptors()
@@ -405,10 +439,10 @@ void TestGLTFLoader::SetupDescriptors()
     // 矩阵描述符集布局
     VkDescriptorSetLayoutBinding setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(&setLayoutBinding, 1);
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
     // 图片描述符集布局
     setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
     // 管线要使用上面两个布局
     std::array<VkDescriptorSetLayout, 2> setLayouts = {descriptorSetLayouts.matrices, descriptorSetLayouts.textures};
     VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
@@ -541,12 +575,11 @@ void TestGLTFLoader::viewChanged()
 void TestGLTFLoader::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {
     if (overlay->header("Settings")) {
-        if (overlay->checkBox("Wireframe", &wireFrame)) {
+        if (overlay->checkBox("WireFrame", &wireFrame)) {
             buildCommandBuffers();
         }
     }
 }
-
 
 TestGLTFLoader * testGLTFLoader;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -560,12 +593,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
-	for (int32_t i = 0; i < __argc; i++) { TestGLTFLoader::args.push_back(__argv[i]); };
+	for (int32_t i = 0; i < __argc; i++)
+    {
+        TestGLTFLoader::args.push_back(__argv[i]);
+    };
+
 	testGLTFLoader = new TestGLTFLoader();
 	testGLTFLoader->initVulkan();
 	testGLTFLoader->setupWindow(hInstance, WndProc);
 	testGLTFLoader->prepare();
 	testGLTFLoader->renderLoop();
 	delete(testGLTFLoader);
+
 	return 0;
 }

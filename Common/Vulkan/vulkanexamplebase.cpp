@@ -105,7 +105,7 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 	}
 #endif
 
-	if (instanceExtensions.size() > 0)
+	if (!instanceExtensions.empty())
 	{
 		if (settings.validation)
 		{
@@ -218,8 +218,8 @@ void VulkanExampleBase::prepare()
 		UIOverlay.device = vulkanDevice;
 		UIOverlay.queue = queue;
 		UIOverlay.shaders = {
-			loadShader(getShadersPath() + "base/uioverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-			loadShader(getShadersPath() + "base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
+			loadShader(getShadersPath() + "Base/UIOverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+			loadShader(getShadersPath() + "Base/UIOverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
 		};
 		UIOverlay.prepareResources();
 		UIOverlay.preparePipeline(pipelineCache, renderPass, swapChain.colorFormat, depthFormat);

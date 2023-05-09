@@ -3,8 +3,6 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
-#define TINYGLTF_NO_STB_IMAGE
-#define TINYGLTF_NO_EXTERNAL_IMAGE
 
 #include "tiny_gltf.h"
 #include "vulkanexamplebase.h"
@@ -17,7 +15,6 @@ struct Vertex
     glm::vec3 normal;
     glm::vec2 uv;
     glm::vec3 color;
-    glm::vec4 tangent;
 };
 
 struct VertexBuffer
@@ -39,6 +36,8 @@ struct StagingBuffer
     VkDeviceMemory memory;
 };
 
+struct Node;
+
 struct Primitive
 {
     uint32_t firstIndex;
@@ -57,8 +56,6 @@ struct Node
     std::vector<Node*> children;
     Mesh mesh;
     glm::mat4 matrix;
-    std::string name;
-    bool visible = true;
     ~Node() {
         for (auto & child : children) {
             delete child;
@@ -137,8 +134,6 @@ public:
     std::vector<Texture> textures;
     std::vector<Material> materials;
     std::vector<Node*> nodes;
-
-    std::string path;
 };
 
 class TestGLTFLoader : public VulkanExampleBase
@@ -160,21 +155,21 @@ public:
     void UpdateUniformBuffers();
 
     void prepare() override;
-    virtual void render();
-    virtual void viewChanged();
+    void render() override;
+    void viewChanged() override;
 
-    virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay);
+    void OnUpdateUIOverlay(vks::UIOverlay* overlay) override;
 
 public:
 
     bool wireFrame = false;
 
-    VulkanGLTFLoader glTFModel;
+    VulkanGLTFLoader glTFModel{};
 
-    VkPipelineLayout pipelineLayout;
-    VkDescriptorSet descriptorSet;
+    VkPipelineLayout pipelineLayout{};
+    VkDescriptorSet descriptorSet{};
 
-    ShaderData shaderData;
-    Pipelines pipelines;
-    DescriptorSetLayouts descriptorSetLayouts;
+    ShaderData shaderData{};
+    Pipelines pipelines{};
+    DescriptorSetLayouts descriptorSetLayouts{};
 };
