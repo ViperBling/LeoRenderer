@@ -514,4 +514,11 @@ namespace vks
 		ImGui::TextV(formatstr, args);
 		va_end(args);
 	}
+
+    bool UIOverlay::inputFloat3(const char *caption, float v[3])
+    {
+		bool res = ImGui::InputFloat3(caption, v);
+		if (res) { updated = true; };
+		return res;
+    }
 }

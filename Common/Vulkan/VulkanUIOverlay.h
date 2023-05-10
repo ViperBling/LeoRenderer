@@ -89,5 +89,6 @@ namespace vks
 		bool button(const char* caption);
 		bool colorPicker(const char* caption, float* color);
 		void text(const char* formatstr, ...);
+		bool inputFloat3(const char* caption, float v[3]);
 	};
 }

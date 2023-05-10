@@ -13,3 +13,5 @@ _deps
 cmake-build-release-visual-studio
 cmake-build-debug
 /cmake-build-release/
+build
+.vscode

@@ -67,8 +67,17 @@ struct Material
 {
     glm::vec4 baseColorFactor = glm::vec4(1.0f);
     uint32_t baseColorTextureIndex;
-    // uint32_t normalTextureIndex;
 
+    float metalicFactor = 1.0f;
+    float roughnessFactor = 1.0f;
+    uint32_t metalicRoughnessTextureIndex;
+
+    glm::vec3 emissiveFactor = glm::vec3(1.0f);
+    uint32_t emissiveTextureIndex;
+
+    uint32_t normalTextureIndex;
+
+    uint32_t AOTextureIndex;
 };
 
 struct Image

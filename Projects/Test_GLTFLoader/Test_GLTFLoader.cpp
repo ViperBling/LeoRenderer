@@ -48,7 +48,7 @@ void VulkanGLTFLoader::LoadImages(tinygltf::Model& input)
             buffer = &glTFImage.image[0];
             bufferSize = glTFImage.image.size();
         }
-        // 加载材质
+        // 加载纹理图片
         images[i].texture.fromBuffer(buffer, bufferSize, VK_FORMAT_R8G8B8A8_UNORM, glTFImage.width, glTFImage.height, vulkanDevice, copyQueue);
         if (deleteBuffer)
         {
@@ -73,12 +73,36 @@ void VulkanGLTFLoader::LoadMaterials(tinygltf::Model &input)
     {
         tinygltf::Material glTFMaterial = input.materials[i];
         // BaseColor
-        if (glTFMaterial.values.find("baseColorFactor") != glTFMaterial.values.end())
-        {
+        if (glTFMaterial.values.find("baseColorFactor") != glTFMaterial.values.end()) {
             materials[i].baseColorFactor = glm::make_vec4(glTFMaterial.values["baseColorFactor"].ColorFactor().data());
         }
         if (glTFMaterial.values.find("baseColorTexture") != glTFMaterial.values.end()) {
             materials[i].baseColorTextureIndex = glTFMaterial.values["baseColorTexture"].TextureIndex();
+        }
+        // Emissive
+        if (glTFMaterial.values.find("emissiveFactor") != glTFMaterial.values.end()) {
+            materials[i].emissiveFactor = glm::make_vec3(glTFMaterial.values["emissiveFactor"].ColorFactor().data());
+        }
+        if (glTFMaterial.values.find("emissiveTexture") != glTFMaterial.values.end()) {
+            materials[i].emissiveTextureIndex = glTFMaterial.values["emissiveTexture"].TextureIndex();
+        }
+        // Normal
+        if (glTFMaterial.values.find("normalTexture") != glTFMaterial.values.end()) {
+            materials[i].normalTextureIndex = glTFMaterial.values["normalTexture"].TextureIndex();
+        }
+        // MetalicRoughness
+        if (glTFMaterial.values.find("metallicFactor") != glTFMaterial.values.end()) {
+            materials[i].metalicFactor = (float)glTFMaterial.values["metallicFactor"].Factor();
+        }
+        if (glTFMaterial.values.find("roughnessFactor") != glTFMaterial.values.end()) {
+            materials[i].roughnessFactor = (float)glTFMaterial.values["roughnessFactor"].Factor();
+        }
+        if (glTFMaterial.values.find("metallicRoughnessTexture") != glTFMaterial.values.end()) {
+            materials[i].metalicRoughnessTextureIndex = glTFMaterial.values["metallicRoughnessTexture"].TextureIndex();
+        }
+        // AO
+        if (glTFMaterial.values.find("occlusionTexture") != glTFMaterial.values.end()) {
+            materials[i].AOTextureIndex = glTFMaterial.values["occlusionTexture"].TextureIndex();
         }
     }
 }
@@ -376,7 +400,7 @@ void TestGLTFLoader::LoadGLTFFile(const std::string filename)
 
 void TestGLTFLoader::LoadAssets()
 {
-    LoadGLTFFile(getAssetPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
+    LoadGLTFFile(getAssetPath() + "Models/BusterDrone/busterDrone.gltf");
 }
 
 void TestGLTFLoader::getEnabledFeatures()
@@ -575,7 +599,8 @@ void TestGLTFLoader::viewChanged()
 void TestGLTFLoader::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {
     if (overlay->header("Settings")) {
-        if (overlay->checkBox("WireFrame", &wireFrame)) {
+        if (overlay->checkBox("WireFrame", &wireFrame))
+        {
             buildCommandBuffers();
         }
     }
