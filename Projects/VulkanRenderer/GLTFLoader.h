@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ProjectPCH.h"
 
@@ -45,7 +45,7 @@ namespace LeoRenderer
 
     struct Material
     {
-        Material(vks::VulkanDevice* device) : mDevice(device) {};
+        explicit Material(vks::VulkanDevice* device) : mDevice(device) {};
         void CreateDescSet(VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, uint32_t descriptorBindingFlags);
 
         enum AlphaMode {
@@ -64,8 +64,8 @@ namespace LeoRenderer
         Texture*            mNormalTexture = nullptr;
         Texture*            mOcclusionTexture = nullptr;
         Texture*            mEmissiveTexture = nullptr;
-        Texture*            mSpecularGlossinessTexture;
-        Texture*            mDiffuseTexture;
+        Texture*            mSpecularGlossinessTexture = nullptr;
+        Texture*            mDiffuseTexture = nullptr;
         VkDescriptorSet     mDescriptorSet{};
     };
 
@@ -105,13 +105,13 @@ namespace LeoRenderer
             VkDescriptorBufferInfo  descriptor;
             VkDescriptorSet         descriptorSet{};
             void*                   mapped;
-        } uniformBuffer;
+        } mUniformBuffer;
 
         struct UniformBlock {
             glm::mat4 matrix;
             glm::mat4 jointMatrix[64]{};
             float jointCount{};
-        } uniformBlock;
+        } mUniformBlock;
 
         vks::VulkanDevice*      mDevice;
         std::vector<Primitive*> mPrimitives;
@@ -130,8 +130,8 @@ namespace LeoRenderer
 
     struct Node
     {
-        glm::mat4 LocalMatrix();
-        glm::mat4 GetMatrix();
+        glm::mat4 LocalMatrix();        // 根据平移、旋转、缩放计算本地矩阵
+        glm::mat4 GetMatrix();          // 根据父节点计算自身的目前的矩阵，因为可能有关联的变换
         void Update();
         ~Node();
 
@@ -185,13 +185,13 @@ namespace LeoRenderer
     {
         static VkVertexInputBindingDescription InputBindingDescription(uint32_t binding);
         static VkVertexInputAttributeDescription InputAttributeDescription(uint32_t binding, uint32_t location, VertexComponent component);
-        static std::vector<VkVertexInputAttributeDescription> InputAttributeDescriptions(uint32_t binding, const std::vector<VertexComponent> components);
+        static std::vector<VkVertexInputAttributeDescription> InputAttributeDescriptions(uint32_t binding, const std::vector<VertexComponent>& components);
         /** @brief Returns the default pipeline vertex input state create info structure for the requested vertex components */
-        static VkPipelineVertexInputStateCreateInfo* GetPipelineVertexInputState(const std::vector<VertexComponent> components);
+        static VkPipelineVertexInputStateCreateInfo* GetPipelineVertexInputState(const std::vector<VertexComponent>& components);
 
         glm::vec3 mPos;
         glm::vec3 mNormal;
-        glm::vec2 mUv;
+        glm::vec2 mUV;
         glm::vec4 mColor;
         glm::vec4 mJoint0;
         glm::vec4 mWeight0;
@@ -203,13 +203,13 @@ namespace LeoRenderer
 
     struct Vertices
     {
-        int count;
+        uint32_t count;
         VkBuffer buffer;
         VkDeviceMemory memory;
     };
     struct Indices
     {
-        int count;
+        uint32_t count;
         VkBuffer buffer;
         VkDeviceMemory memory;
     };
@@ -234,12 +234,12 @@ namespace LeoRenderer
     public:
         Model() {};
         ~Model();
-        void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, std::vector<uint32_t>& indexBuffer, std::vector<Vertex>& vertexBuffer, float globalscale);
+        void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, std::vector<uint32_t>& indexBuffer, std::vector<Vertex>& vertexBuffer, float globalScale);
         void LoadSkins(tinygltf::Model& gltfModel);
         void LoadImages(tinygltf::Model& gltfModel, vks::VulkanDevice* device, VkQueue transferQueue);
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);
-        void LoadFromFile(std::string filename, vks::VulkanDevice* device, VkQueue transferQueue, uint32_t fileLoadingFlags = LeoRenderer::FileLoadingFlags::None, float scale = 1.0f);
+        void LoadFromFile(std::string& filename, vks::VulkanDevice* device, VkQueue transferQueue, uint32_t fileLoadingFlags = LeoRenderer::FileLoadingFlags::None, float scale = 1.0f);
         void BindBuffers(VkCommandBuffer commandBuffer);
         void DrawNode(Node* node, VkCommandBuffer commandBuffer, uint32_t renderFlags = 0, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);
         void Draw(VkCommandBuffer commandBuffer, uint32_t renderFlags = 0, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);

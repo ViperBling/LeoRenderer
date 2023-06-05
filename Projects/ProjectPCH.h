@@ -7,6 +7,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <stddef.h>
 
 #include "vulkan/vulkan.h"
 #include "VulkanDevice.h"
