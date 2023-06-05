@@ -1,3 +1,4 @@
+include_directories(./)
 # Function for building single example
 function(buildProject PROJECT_NAME)
     SET(PROJECT_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME})
@@ -25,7 +26,7 @@ function(buildProject PROJECT_NAME)
     # Add optional readme / tutorial
     file(GLOB README_FILES "${PROJECT_FOLDER}/*.md")
     if(WIN32)
-        add_executable(${PROJECT_NAME} WIN32 ${MAIN_CPP} ${SOURCE} ${MAIN_HEADER} ${SHADERS_GLSL} ${SHADERS_HLSL} ${README_FILES})
+        add_executable(${PROJECT_NAME} WIN32 ${MAIN_CPP} ${SOURCE} ${MAIN_HEADER} ${SHADERS_GLSL} ${SHADERS_HLSL} ${README_FILES} ProjectPCH.h)
         target_link_libraries(${PROJECT_NAME} CommonLib ${Vulkan_LIBRARY} ${WINLIBS})
     else(WIN32)
         add_executable(${PROJECT_NAME} ${MAIN_CPP} ${SOURCE} ${MAIN_HEADER} ${SHADERS_GLSL} ${SHADERS_HLSL} ${README_FILES})
@@ -47,7 +48,7 @@ function(buildProjects)
 endfunction(buildProjects)
 
 set(PROJECTS
-#    VulkanRenderer
+    VulkanRenderer
     Test_Triangle
     Test_GLTFLoader
     )

@@ -1,3 +1,6 @@
-//
-// Created by Administrator on 2023/5/5.
-//
+#include <iostream>
+
+int main()
+{
+    return 0;
+}
