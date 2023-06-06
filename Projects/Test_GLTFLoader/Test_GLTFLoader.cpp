@@ -285,7 +285,7 @@ void VulkanGLTFLoader::Draw(VkCommandBuffer cmdBuffer, VkPipelineLayout pipeline
 }
 
 
-TestGLTFLoader::TestGLTFLoader() : VulkanExampleBase(ENABLE_VALIDATION)
+TestGLTFLoader::TestGLTFLoader() : VulkanFramework(ENABLE_VALIDATION)
 {
     title = "GLTFLoader";
     camera.type = Camera::CameraType::lookat;
@@ -403,12 +403,12 @@ void TestGLTFLoader::LoadAssets()
     LoadGLTFFile(getAssetPath() + "Models/BusterDrone/busterDrone.gltf");
 }
 
-void TestGLTFLoader::getEnabledFeatures()
+void TestGLTFLoader::GetEnabledFeatures()
 {
     if (deviceFeatures.fillModeNonSolid) enabledFeatures.fillModeNonSolid = VK_TRUE;
 }
 
-void TestGLTFLoader::buildCommandBuffers()
+void TestGLTFLoader::BuildCommandBuffers()
 {
     VkCommandBufferBeginInfo cmdBufferBI = vks::initializers::commandBufferBeginInfo();
 
@@ -441,7 +441,7 @@ void TestGLTFLoader::buildCommandBuffers()
         vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
         vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrame ? pipelines.wireFrame : pipelines.solid);
         glTFModel.Draw(drawCmdBuffers[i], pipelineLayout);
-        drawUI(drawCmdBuffers[i]);
+        DrawUI(drawCmdBuffers[i]);
         vkCmdEndRenderPass(drawCmdBuffers[i]);
         VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
     }
@@ -522,8 +522,8 @@ void TestGLTFLoader::PreparePipelines()
     vertexInputStateCI.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
     const std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
-        loadShader(getShadersPath() + "TestGLTFLoader/TestGLTFLoaderGLSL.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-        loadShader(getShadersPath() + "TestGLTFLoader/TestGLTFLoaderGLSL.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        LoadShader(getShadersPath() + "TestGLTFLoader/TestGLTFLoaderGLSL.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader(getShadersPath() + "TestGLTFLoader/TestGLTFLoaderGLSL.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
 
     VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
@@ -572,26 +572,26 @@ void TestGLTFLoader::UpdateUniformBuffers()
     memcpy(shaderData.buffer.mapped, &shaderData.values, sizeof(shaderData.values));
 }
 
-void TestGLTFLoader::prepare()
+void TestGLTFLoader::Prepare()
 {
-    VulkanExampleBase::prepare();
+    VulkanFramework::Prepare();
     LoadAssets();
     PrepareUniformBuffers();
     SetupDescriptors();
     PreparePipelines();
-    buildCommandBuffers();
+    BuildCommandBuffers();
     prepared = true;
 }
 
-void TestGLTFLoader::render()
+void TestGLTFLoader::Render()
 {
-    renderFrame();
+    RenderFrame();
     if (camera.updated) {
         UpdateUniformBuffers();
     }
 }
 
-void TestGLTFLoader::viewChanged()
+void TestGLTFLoader::ViewChanged()
 {
     UpdateUniformBuffers();
 }
@@ -601,7 +601,7 @@ void TestGLTFLoader::OnUpdateUIOverlay(vks::UIOverlay *overlay)
     if (overlay->header("Settings")) {
         if (overlay->checkBox("WireFrame", &wireFrame))
         {
-            buildCommandBuffers();
+            BuildCommandBuffers();
         }
     }
 }
@@ -611,7 +611,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (testGLTFLoader != nullptr)
 	{
-        testGLTFLoader->handleMessages(hWnd, uMsg, wParam, lParam);
+        testGLTFLoader->HandleMessages(hWnd, uMsg, wParam, lParam);
 	}
 	return (DefWindowProc(hWnd, uMsg, wParam, lParam));
 }
@@ -624,10 +624,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
     };
 
 	testGLTFLoader = new TestGLTFLoader();
-	testGLTFLoader->initVulkan();
-	testGLTFLoader->setupWindow(hInstance, WndProc);
-	testGLTFLoader->prepare();
-	testGLTFLoader->renderLoop();
+	testGLTFLoader->InitVulkan();
+	testGLTFLoader->SetupWindow(hInstance, WndProc);
+	testGLTFLoader->Prepare();
+	testGLTFLoader->RenderLoop();
 	delete(testGLTFLoader);
 
 	return 0;

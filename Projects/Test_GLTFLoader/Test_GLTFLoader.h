@@ -5,7 +5,7 @@
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 
 #include "tiny_gltf.h"
-#include "vulkanexamplebase.h"
+#include "VulkanFramework.h"
 
 #define ENABLE_VALIDATION true
 
@@ -145,7 +145,7 @@ public:
     std::vector<Node*> nodes;
 };
 
-class TestGLTFLoader : public VulkanExampleBase
+class TestGLTFLoader : public VulkanFramework
 {
 public:
 
@@ -155,17 +155,17 @@ public:
     void LoadGLTFFile(std::string filename);
     void LoadAssets();
 
-    void getEnabledFeatures() override;
-    void buildCommandBuffers() override;
+    void GetEnabledFeatures() override;
+    void BuildCommandBuffers() override;
 
     void SetupDescriptors();
     void PreparePipelines();
     void PrepareUniformBuffers();
     void UpdateUniformBuffers();
 
-    void prepare() override;
-    void render() override;
-    void viewChanged() override;
+    void Prepare() override;
+    void Render() override;
+    void ViewChanged() override;
 
     void OnUpdateUIOverlay(vks::UIOverlay* overlay) override;
 

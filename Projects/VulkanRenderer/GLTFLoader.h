@@ -2,12 +2,6 @@
 
 #include "ProjectPCH.h"
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 
 #include "tiny_gltf.h"
@@ -214,7 +208,8 @@ namespace LeoRenderer
         VkDeviceMemory memory;
     };
 
-    enum FileLoadingFlags {
+    enum FileLoadingFlags
+    {
         None = 0x00000000,
         PreTransformVertices = 0x00000001,
         PreMultiplyVertexColors = 0x00000002,
@@ -222,18 +217,19 @@ namespace LeoRenderer
         DontLoadImages = 0x00000008
     };
 
-    enum RenderFlags {
+    enum RenderFlags
+    {
         BindImages = 0x00000001,
         RenderOpaqueNodes = 0x00000002,
         RenderAlphaMaskedNodes = 0x00000004,
         RenderAlphaBlendedNodes = 0x00000008
     };
 
-    class Model
+    class GLTFModel
     {
     public:
-        Model() {};
-        ~Model();
+        GLTFModel() {};
+        ~GLTFModel();
         void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, std::vector<uint32_t>& indexBuffer, std::vector<Vertex>& vertexBuffer, float globalScale);
         void LoadSkins(tinygltf::Model& gltfModel);
         void LoadImages(tinygltf::Model& gltfModel, vks::VulkanDevice* device, VkQueue transferQueue);

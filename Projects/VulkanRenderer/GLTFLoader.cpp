@@ -596,7 +596,7 @@ VkPipelineVertexInputStateCreateInfo * LeoRenderer::Vertex::GetPipelineVertexInp
 }
 
 
-LeoRenderer::Model::~Model()
+LeoRenderer::GLTFModel::~GLTFModel()
 {
     vkDestroyBuffer(m_pDevice->logicalDevice, mVertices.buffer, nullptr);
     vkFreeMemory(m_pDevice->logicalDevice, mVertices.memory, nullptr);
@@ -621,7 +621,7 @@ LeoRenderer::Model::~Model()
     mEmptyTexture.OnDestroy();
 }
 
-void LeoRenderer::Model::LoadNode(
+void LeoRenderer::GLTFModel::LoadNode(
     LeoRenderer::Node *parent,
     const tinygltf::Node &node,
     uint32_t nodeIndex,
@@ -849,7 +849,7 @@ void LeoRenderer::Model::LoadNode(
     mLinearNodes.push_back(newNode);
 }
 
-void LeoRenderer::Model::LoadSkins(tinygltf::Model &gltfModel)
+void LeoRenderer::GLTFModel::LoadSkins(tinygltf::Model &gltfModel)
 {
     for (tinygltf::Skin &source : gltfModel.skins)
     {
@@ -882,7 +882,7 @@ void LeoRenderer::Model::LoadSkins(tinygltf::Model &gltfModel)
     }
 }
 
-void LeoRenderer::Model::LoadImages(tinygltf::Model &gltfModel, vks::VulkanDevice *device, VkQueue transferQueue)
+void LeoRenderer::GLTFModel::LoadImages(tinygltf::Model &gltfModel, vks::VulkanDevice *device, VkQueue transferQueue)
 {
     for (tinygltf::Image& image : gltfModel.images)
     {
@@ -893,7 +893,7 @@ void LeoRenderer::Model::LoadImages(tinygltf::Model &gltfModel, vks::VulkanDevic
     CreateEmptyTexture(transferQueue);
 }
 
-void LeoRenderer::Model::LoadMaterials(tinygltf::Model &gltfModel)
+void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
 {
     for (tinygltf::Material &mat : gltfModel.materials)
     {
@@ -955,7 +955,7 @@ void LeoRenderer::Model::LoadMaterials(tinygltf::Model &gltfModel)
     mMaterials.emplace_back(m_pDevice);
 }
 
-void LeoRenderer::Model::LoadAnimations(tinygltf::Model &gltfModel)
+void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
 {
     for (tinygltf::Animation &anim : gltfModel.animations) {
         LeoRenderer::Animation animation{};
@@ -1079,7 +1079,7 @@ void LeoRenderer::Model::LoadAnimations(tinygltf::Model &gltfModel)
     }
 }
 
-void LeoRenderer::Model::LoadFromFile(
+void LeoRenderer::GLTFModel::LoadFromFile(
     std::string& filename,
     vks::VulkanDevice *device,
     VkQueue transferQueue,
@@ -1342,67 +1342,313 @@ void LeoRenderer::Model::LoadFromFile(
     }
 }
 
-void LeoRenderer::Model::BindBuffers(VkCommandBuffer commandBuffer)
+void LeoRenderer::GLTFModel::BindBuffers(VkCommandBuffer commandBuffer)
 {
-
+    const VkDeviceSize offsets[1]{};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.buffer, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, mIndices.buffer, 0, VK_INDEX_TYPE_UINT32);
+    m_bBufferBound = true;
 }
 
-void LeoRenderer::Model::DrawNode(
+void LeoRenderer::GLTFModel::DrawNode(
     LeoRenderer::Node *node,
     VkCommandBuffer commandBuffer,
     uint32_t renderFlags,
     VkPipelineLayout pipelineLayout,
     uint32_t bindImageSet)
 {
+    if (node->mMesh)
+    {
+        for (auto primitive : node->mMesh->mPrimitives)
+        {
+            bool skip = false;
+            const LeoRenderer::Material& material = primitive->mMaterial;
 
+            if (renderFlags & RenderFlags::RenderOpaqueNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_OPAQUE);
+            if (renderFlags & RenderFlags::RenderAlphaMaskedNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_MASK);
+            if (renderFlags & RenderFlags::RenderAlphaBlendedNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_BLEND);
+
+            if (!skip)
+            {
+                if (renderFlags & RenderFlags::BindImages)
+                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
+                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+            }
+        }
+    }
+    for (auto& child : node->mChildren) DrawNode(child, commandBuffer, renderFlags, pipelineLayout, bindImageSet);
 }
 
-void LeoRenderer::Model::Draw(
+void LeoRenderer::GLTFModel::Draw(
     VkCommandBuffer commandBuffer,
     uint32_t renderFlags,
     VkPipelineLayout pipelineLayout,
     uint32_t bindImageSet)
 {
-
+    if (!m_bBufferBound)
+    {
+        const VkDeviceSize offsets[1]{};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.buffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, mIndices.buffer, 0, VK_INDEX_TYPE_UINT32);
+    }
+    for (auto& node : mNodes) DrawNode(node, commandBuffer, renderFlags, pipelineLayout, bindImageSet);
 }
 
-void LeoRenderer::Model::GetNodeDimensions(LeoRenderer::Node *node, glm::vec3 &min, glm::vec3 &max)
+void LeoRenderer::GLTFModel::GetNodeDimensions(LeoRenderer::Node *node, glm::vec3 &min, glm::vec3 &max)
 {
-
+    if (node->mMesh)
+    {
+        for (auto primitive : node->mMesh->mPrimitives)
+        {
+            glm::vec4 locMin = glm::vec4(primitive->mDimensions.min, 1.0f) * node->GetMatrix();
+            glm::vec4 locMax = glm::vec4(primitive->mDimensions.max, 1.0f) * node->GetMatrix();
+            if (locMin.x < min.x) { min.x = locMin.x; }
+            if (locMin.y < min.y) { min.y = locMin.y; }
+            if (locMin.z < min.z) { min.z = locMin.z; }
+            if (locMax.x > max.x) { max.x = locMax.x; }
+            if (locMax.y > max.y) { max.y = locMax.y; }
+            if (locMax.z > max.z) { max.z = locMax.z; }
+        }
+    }
+    for (auto child : node->mChildren) GetNodeDimensions(child, min, max);
 }
 
-void LeoRenderer::Model::GetSceneDimensions()
+void LeoRenderer::GLTFModel::GetSceneDimensions()
 {
+    mDimensions.min = glm::vec3(FLT_MAX);
+    mDimensions.max = glm::vec3(-FLT_MAX);
+    for (auto node : mNodes)
+        GetNodeDimensions(node, mDimensions.min, mDimensions.max);
 
+    mDimensions.size = mDimensions.max - mDimensions.min;
+    mDimensions.center = (mDimensions.min + mDimensions.max) / 2.0f;
+    mDimensions.radius = glm::distance(mDimensions.min, mDimensions.max) / 2.0f;
 }
 
-void LeoRenderer::Model::UpdateAnimation(uint32_t index, float time)
+void LeoRenderer::GLTFModel::UpdateAnimation(uint32_t index, float time)
 {
+    if (index > static_cast<uint32_t>(mAnimations.size()) - 1)
+    {
+        std::cout << "No animation with index " << index << std::endl;
+        return;
+    }
+    Animation &animation = mAnimations[index];
 
+    bool updated = false;
+    for (auto& channel : animation.mChannels)
+    {
+        LeoRenderer::AnimationSampler &sampler = animation.mSamplers[channel.mSamplerIndex];
+        if (sampler.mInputs.size() > sampler.mOutputsVec4.size()) continue;
+
+        for (auto i = 0; i < sampler.mInputs.size() - 1; i++)
+        {
+            // 如果当前时间在两帧动画之间就进行插值
+            if ((time >= sampler.mInputs[i]) && (time <= sampler.mInputs[i + 1]))
+            {
+                // 插值
+                float u = std::max(0.0f, time - sampler.mInputs[i]) / (sampler.mInputs[i + 1] - sampler.mInputs[i]);
+                if (u <= 1.0f)
+                {
+                    switch (channel.mPath)
+                    {
+                        case LeoRenderer::AnimationChannel::PathType::TRANSLATION:
+                        {
+                            glm::vec4 trans = glm::mix(sampler.mOutputsVec4[i], sampler.mOutputsVec4[i + 1], u);
+                            channel.mNode->mTranslation = glm::vec3(trans);
+                            break;
+                        }
+                        case LeoRenderer::AnimationChannel::PathType::SCALE:
+                        {
+                            glm::vec4 trans = glm::mix(sampler.mOutputsVec4[i], sampler.mOutputsVec4[i + 1], u);
+                            channel.mNode->mScale = glm::vec3(trans);
+                            break;
+                        }
+                        case LeoRenderer::AnimationChannel::PathType::ROTATION:
+                        {
+                            glm::quat q1;
+                            q1.x = sampler.mOutputsVec4[i].x;
+                            q1.y = sampler.mOutputsVec4[i].y;
+                            q1.z = sampler.mOutputsVec4[i].z;
+                            q1.w = sampler.mOutputsVec4[i].w;
+                            glm::quat q2;
+                            q2.x = sampler.mOutputsVec4[i + 1].x;
+                            q2.y = sampler.mOutputsVec4[i + 1].y;
+                            q2.z = sampler.mOutputsVec4[i + 1].z;
+                            q2.w = sampler.mOutputsVec4[i + 1].w;
+                            channel.mNode->mRotation = glm::normalize(glm::slerp(q1, q2, u));
+                            break;
+                        }
+                    }
+                    updated = true;
+                }
+            }
+        }
+    }
+    if (updated)
+    {
+        for (auto &node : mNodes) node->Update();
+    }
 }
 
-LeoRenderer::Node *LeoRenderer::Model::FindNode(LeoRenderer::Node *parent, uint32_t index)
+LeoRenderer::Node *LeoRenderer::GLTFModel::FindNode(LeoRenderer::Node *parent, uint32_t index)
 {
-    return nullptr;
+    Node* nodeFound = nullptr;
+    if (parent->mIndex == index) return parent;
+    for (auto& child : parent->mChildren)
+    {
+        nodeFound = FindNode(child, index);
+        if (nodeFound) break;
+    }
+    return nodeFound;
 }
 
-LeoRenderer::Node *LeoRenderer::Model::NodeFromIndex(uint32_t index)
+LeoRenderer::Node *LeoRenderer::GLTFModel::NodeFromIndex(uint32_t index)
 {
-    return nullptr;
+    Node* nodeFound = nullptr;
+    for (auto & node : mNodes)
+    {
+        nodeFound = FindNode(node, index);
+        if (nodeFound) break;
+    }
+    return nodeFound;
 }
 
-void LeoRenderer::Model::PrepareNodeDescriptor(
+void LeoRenderer::GLTFModel::PrepareNodeDescriptor(
     LeoRenderer::Node *node, VkDescriptorSetLayout descriptorSetLayout)
 {
+    if (node->mMesh)
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
+        descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        descriptorSetAllocInfo.descriptorPool = mDescPool;
+        descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
+        descriptorSetAllocInfo.descriptorSetCount = 1;
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_pDevice->logicalDevice, &descriptorSetAllocInfo, &node->mMesh->mUniformBuffer.descriptorSet));
 
+        VkWriteDescriptorSet writeDescriptorSet{};
+        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescriptorSet.descriptorCount = 1;
+        writeDescriptorSet.dstSet = node->mMesh->mUniformBuffer.descriptorSet;
+        writeDescriptorSet.dstBinding = 0;
+        writeDescriptorSet.pBufferInfo = &node->mMesh->mUniformBuffer.descriptor;
+
+        vkUpdateDescriptorSets(m_pDevice->logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
+    }
+    for (auto& child : node->mChildren)
+    {
+        PrepareNodeDescriptor(child, descriptorSetLayout);
+    }
 }
 
-LeoRenderer::Texture *LeoRenderer::Model::GetTexture(uint32_t index)
+LeoRenderer::Texture *LeoRenderer::GLTFModel::GetTexture(uint32_t index)
 {
+    if (index < mTextures.size())
+    {
+        return &mTextures[index];
+    }
     return nullptr;
 }
 
-void LeoRenderer::Model::CreateEmptyTexture(VkQueue transferQueue)
+void LeoRenderer::GLTFModel::CreateEmptyTexture(VkQueue transferQueue)
 {
+    mEmptyTexture.mDevice = m_pDevice;
+    mEmptyTexture.mWidth = 1;
+    mEmptyTexture.mHeight = 1;
+    mEmptyTexture.mLayerCount = 1;
+    mEmptyTexture.mMipLevels = 1;;
 
+    size_t bufferSize = mEmptyTexture.mWidth * mEmptyTexture.mHeight * 4;
+    auto buffer = new unsigned char[bufferSize];
+    memset(buffer, 0, bufferSize);
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo();
+    bufferCreateInfo.size = bufferSize;
+    // This buffer is used as a transfer source for the buffer copy
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VK_CHECK_RESULT(vkCreateBuffer(m_pDevice->logicalDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
+
+    VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(m_pDevice->logicalDevice, stagingBuffer, &memReqs);
+    memAllocInfo.allocationSize = memReqs.size;
+    memAllocInfo.memoryTypeIndex = m_pDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VK_CHECK_RESULT(vkAllocateMemory(m_pDevice->logicalDevice, &memAllocInfo, nullptr, &stagingMemory));
+    VK_CHECK_RESULT(vkBindBufferMemory(m_pDevice->logicalDevice, stagingBuffer, stagingMemory, 0));
+
+    // Copy texture data into staging buffer
+    uint8_t* data;
+    VK_CHECK_RESULT(vkMapMemory(m_pDevice->logicalDevice, stagingMemory, 0, memReqs.size, 0, (void**)&data));
+    memcpy(data, buffer, bufferSize);
+    vkUnmapMemory(m_pDevice->logicalDevice, stagingMemory);
+
+    VkBufferImageCopy bufferCopyRegion = {};
+    bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    bufferCopyRegion.imageSubresource.layerCount = 1;
+    bufferCopyRegion.imageExtent.width = mEmptyTexture.mWidth;
+    bufferCopyRegion.imageExtent.height = mEmptyTexture.mHeight;
+    bufferCopyRegion.imageExtent.depth = 1;
+
+    // Create optimal tiled target image
+    VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageCreateInfo.mipLevels = 1;
+    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateInfo.extent = { mEmptyTexture.mWidth, mEmptyTexture.mHeight, 1 };
+    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    VK_CHECK_RESULT(vkCreateImage(m_pDevice->logicalDevice, &imageCreateInfo, nullptr, &mEmptyTexture.mImage));
+
+    vkGetImageMemoryRequirements(m_pDevice->logicalDevice, mEmptyTexture.mImage, &memReqs);
+    memAllocInfo.allocationSize = memReqs.size;
+    memAllocInfo.memoryTypeIndex = m_pDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(vkAllocateMemory(m_pDevice->logicalDevice, &memAllocInfo, nullptr, &mEmptyTexture.mDeviceMemory));
+    VK_CHECK_RESULT(vkBindImageMemory(m_pDevice->logicalDevice, mEmptyTexture.mImage, mEmptyTexture.mDeviceMemory, 0));
+
+    VkImageSubresourceRange subresourceRange{};
+    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresourceRange.baseMipLevel = 0;
+    subresourceRange.levelCount = 1;
+    subresourceRange.layerCount = 1;
+
+    VkCommandBuffer copyCmd = m_pDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+    vks::tools::setImageLayout(copyCmd, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
+    vkCmdCopyBufferToImage(copyCmd, stagingBuffer, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
+    vks::tools::setImageLayout(copyCmd, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+    m_pDevice->flushCommandBuffer(copyCmd, transferQueue);
+    mEmptyTexture.mImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    // Clean up staging resources
+    vkFreeMemory(m_pDevice->logicalDevice, stagingMemory, nullptr);
+    vkDestroyBuffer(m_pDevice->logicalDevice, stagingBuffer, nullptr);
+
+    VkSamplerCreateInfo samplerCreateInfo = vks::initializers::samplerCreateInfo();
+    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+    samplerCreateInfo.maxAnisotropy = 1.0f;
+    VK_CHECK_RESULT(vkCreateSampler(m_pDevice->logicalDevice, &samplerCreateInfo, nullptr, &mEmptyTexture.mSampler));
+
+    VkImageViewCreateInfo viewCreateInfo = vks::initializers::imageViewCreateInfo();
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    viewCreateInfo.subresourceRange.levelCount = 1;
+    viewCreateInfo.image = mEmptyTexture.mImage;
+    VK_CHECK_RESULT(vkCreateImageView(m_pDevice->logicalDevice, &viewCreateInfo, nullptr, &mEmptyTexture.mImageView));
+
+    mEmptyTexture.mDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    mEmptyTexture.mDescriptor.imageView = mEmptyTexture.mImageView;
+    mEmptyTexture.mDescriptor.sampler = mEmptyTexture.mSampler;
 }
