@@ -1,4 +1,4 @@
-#include "VulkanRenderer.h"
+﻿#include "VulkanRenderer.h"
 
 LeoRenderer::VulkanRenderer::VulkanRenderer()
 {
@@ -72,9 +72,75 @@ void LeoRenderer::VulkanRenderer::LoadAssets()
     LoadGLTFFile(assets);
 }
 
+/*
+ *  构造资源描述符，用来描述管线上用到的资源，这里主要是变换矩阵和使用的材质（BaseColor，NormalMap)
+ *  1) 创建资源描述符池
+ *  2) 创建两类资源的描述符集布局，描述这两个资源在GPU中怎样被使用。传参有资源类型（uniform还是图像sampler），
+ *     管线阶段，绑定位置（对应了Shader中的Location）
+ *  3) 创建管线布局
+ *  4) 分别为两种资源分配描述符集
+ */
 void LeoRenderer::VulkanRenderer::SetupDescriptors()
 {
+    std::vector<VkDescriptorPoolSize> poolSize =
+    {
+        vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
+        vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(mScene.mMaterials.size()) * 2),
+    };
+    // 一个Set用于矩阵变换和逐物体材质
+    const uint32_t maxSetCount = static_cast<uint32_t>(mScene.mTextures.size()) + 1;
+    VkDescriptorPoolCreateInfo descPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSize, maxSetCount);
+    VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descPoolInfo, nullptr, &descriptorPool));
 
+    // 用于传矩阵的描述符集布局
+    std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings =
+    {
+        vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+    };
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindings.data(), static_cast<uint32_t>(descSetLayoutBindings.size()));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mCustomDescSetLayouts.mMatrices));
+
+    // 材质贴图描述符集布局
+    descSetLayoutBindings =
+    {
+        // Color Map
+        vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+        // Normal Map
+        vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+    };
+    descSetLayoutCI.pBindings = descSetLayoutBindings.data();
+    descSetLayoutCI.bindingCount = 2;
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mCustomDescSetLayouts.mTextures));
+
+    // 两个描述符集的管线布局，一个是矩阵，另一个是材质
+    std::array<VkDescriptorSetLayout, 2> descSetLayouts = { mCustomDescSetLayouts.mMatrices, mCustomDescSetLayouts.mTextures };
+    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), static_cast<uint32_t>(descSetLayouts.size()));
+    // 使用pushconstant传递矩阵
+    VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
+    pipelineLayoutCI.pushConstantRangeCount = 1;
+    pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &mPipelineLayout));
+
+    // 矩阵描述符集
+    VkDescriptorSetAllocateInfo matDescSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mCustomDescSetLayouts.mMatrices, 1);
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &matDescSetAI, &mDescSet));
+    VkWriteDescriptorSet matWriteDescSet = vks::initializers::writeDescriptorSet(mDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mShaderData.mBuffer.descriptor);
+    vkUpdateDescriptorSets(device, 1, &matWriteDescSet, 0, nullptr);
+
+    // 材质的描述符集
+    for (auto & mat : mScene.mMaterials)
+    {
+        const VkDescriptorSetAllocateInfo texDescSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mCustomDescSetLayouts.mTextures, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &texDescSetAI, &mat.mDescriptorSet));
+        VkDescriptorImageInfo colorMap = mat.mBaseColorTexture->mDescriptor;
+        VkDescriptorImageInfo normalMap = mat.mNormalTexture->mDescriptor;
+        std::vector<VkWriteDescriptorSet> writeDescSets =
+        {
+            vks::initializers::writeDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &colorMap),
+            vks::initializers::writeDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &normalMap),
+        };
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+    }
 }
 
 void LeoRenderer::VulkanRenderer::PreparePipelines()
