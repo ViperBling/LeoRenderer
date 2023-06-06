@@ -145,41 +145,159 @@ void LeoRenderer::VulkanRenderer::SetupDescriptors()
 
 void LeoRenderer::VulkanRenderer::PreparePipelines()
 {
+    VkPipelineInputAssemblyStateCreateInfo iaStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+    VkPipelineRasterizationStateCreateInfo rsStateCI = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE, 0);
+    VkPipelineColorBlendAttachmentState cbAttachState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+    VkPipelineColorBlendStateCreateInfo cbStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(1, &cbAttachState);
+    VkPipelineDepthStencilStateCreateInfo dsStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+    VkPipelineViewportStateCreateInfo vpStateCI = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+    VkPipelineMultisampleStateCreateInfo msStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+    const std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);
 
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageCIs{};
+    shaderStageCIs[0] = LoadShader(getShadersPath() + "Lambert.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStageCIs[1] = LoadShader(getShadersPath() + "Lambert.vert.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    const std::vector<VkVertexInputBindingDescription> viBindings =
+    {
+        vks::initializers::vertexInputBindingDescription(0, sizeof(LeoRenderer::Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+    };
+    std::vector<LeoRenderer::VertexComponent> vertexComponents =
+    {
+        LeoRenderer::VertexComponent::Position,
+        LeoRenderer::VertexComponent::Normal,
+        LeoRenderer::VertexComponent::UV,
+        LeoRenderer::VertexComponent::Color,
+        LeoRenderer::VertexComponent::Tangent,
+    };
+    const std::vector<VkVertexInputAttributeDescription> viAttributes = LeoRenderer::Vertex::InputAttributeDescriptions(0, vertexComponents);
+    VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(viBindings, viAttributes);
+
+    VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(mPipelineLayout, renderPass, 0);
+    pipelineCI.pInputAssemblyState = &iaStateCI;
+    pipelineCI.pVertexInputState = &viStateCI;
+    pipelineCI.pRasterizationState = &rsStateCI;
+    pipelineCI.pMultisampleState = &msStateCI;
+    pipelineCI.pColorBlendState = &cbStateCI;
+    pipelineCI.pDepthStencilState = &dsStateCI;
+    pipelineCI.pViewportState = &vpStateCI;
+    pipelineCI.pDynamicState = &dyStateCI;
+    pipelineCI.stageCount = static_cast<uint32_t>(shaderStageCIs.size());
+    pipelineCI.pStages = shaderStageCIs.data();
+
+    for (auto & mat : mScene.mMaterials)
+    {
+        struct MatSpecialData
+        {
+            VkBool32 alphaMask{};
+            float alphaMaskCutOff{};
+        } matSpecialData;
+
+        matSpecialData.alphaMask = mat.mAlphaMode == Material::ALPHA_MODE_MASK;
+        matSpecialData.alphaMaskCutOff = mat.mAlphaCutoff;
+
+        std::vector<VkSpecializationMapEntry> specializeMapEntries =
+        {
+            vks::initializers::specializationMapEntry(0, offsetof(MatSpecialData, alphaMask), sizeof(MatSpecialData::alphaMask)),
+            vks::initializers::specializationMapEntry(1, offsetof(MatSpecialData, alphaMaskCutOff), sizeof(MatSpecialData::alphaMaskCutOff)),
+        };
+        VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(specializeMapEntries, sizeof(matSpecialData), &matSpecialData);
+        shaderStageCIs[1].pSpecializationInfo = &specializationInfo;
+
+        rsStateCI.cullMode = mat.m_bDoubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mat.mPipeline));
+    }
 }
 
 void LeoRenderer::VulkanRenderer::PrepareUniformBuffers()
 {
-
+    VK_CHECK_RESULT(vulkanDevice->createBuffer(
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &mShaderData.mBuffer,
+        sizeof(mShaderData.mValues)));
+    VK_CHECK_RESULT(mShaderData.mBuffer.map());
+    UpdateUniformBuffers();
 }
 
 void LeoRenderer::VulkanRenderer::UpdateUniformBuffers()
 {
-
+    mShaderData.mValues.projection = camera.matrices.perspective;
+    mShaderData.mValues.view = camera.matrices.view;
+    mShaderData.mValues.viewPos = camera.viewPos;
+    memcpy(mShaderData.mBuffer.mapped, &mShaderData.mValues, sizeof(mShaderData.mValues));
 }
 
 void LeoRenderer::VulkanRenderer::Prepare()
 {
     VulkanFramework::Prepare();
+    LoadAssets();
+    PrepareUniformBuffers();
+    SetupDescriptors();
+    PreparePipelines();
+    BuildCommandBuffers();
+    prepared = true;
 }
 
 void LeoRenderer::VulkanRenderer::Render()
 {
-
+    RenderFrame();
+    if (camera.updated) UpdateUniformBuffers();
 }
 
 void LeoRenderer::VulkanRenderer::ViewChanged()
 {
-    VulkanFramework::ViewChanged();
+    UpdateUniformBuffers();
 }
 
 void LeoRenderer::VulkanRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {
-    VulkanFramework::OnUpdateUIOverlay(overlay);
+    if (overlay->button("All"))
+    {
+        std::for_each(mScene.mNodes.begin(), mScene.mNodes.end(), [](LeoRenderer::Node* node) { node->visible = true; });
+        BuildCommandBuffers();
+    }
+    ImGui::SameLine();
+    if (overlay->button("None"))
+    {
+        std::for_each(mScene.mNodes.begin(), mScene.mNodes.end(), [](LeoRenderer::Node* node) { node->visible = false; });
+        BuildCommandBuffers();
+    }
+    ImGui::NewLine();
+
+    // POI: Create a list of glTF nodes for visibility toggle
+    ImGui::BeginChild("#Nodelist", ImVec2(200.0f * overlay->scale, 340.0f * overlay->scale), false);
+    for (auto& node : mScene.mNodes)
+    {
+        if (overlay->checkBox(node->mName.c_str(), &node->visible))
+        {
+            BuildCommandBuffers();
+        }
+    }
+    ImGui::EndChild();
 }
 
+LeoRenderer::VulkanRenderer* renderer;
 
-int main()
+LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    return 0;
+	if (renderer != nullptr)
+	{
+		renderer->HandleMessages(hWnd, uMsg, wParam, lParam);
+	}
+	return (DefWindowProc(hWnd, uMsg, wParam, lParam));
+}
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+{
+	for (int32_t i = 0; i < __argc; i++) { LeoRenderer::VulkanRenderer::args.push_back(__argv[i]); };
+	renderer = new LeoRenderer::VulkanRenderer();
+	renderer->InitVulkan();
+	renderer->SetupWindow(hInstance, WndProc);
+	renderer->Prepare();
+	renderer->RenderLoop();
+	delete(renderer);
+	return 0;
 }

@@ -941,15 +941,15 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         {
             tinygltf::Parameter param = mat.additionalValues["alphaMode"];
 
-            if (param.string_value == "BLEND") material.mAlphaMode = Material::ALPHAMODE_BLEND;
-            if (param.string_value == "MASK") material.mAlphaMode = Material::ALPHAMODE_MASK;
+            if (param.string_value == "BLEND") material.mAlphaMode = Material::ALPHA_MODE_BLEND;
+            if (param.string_value == "MASK") material.mAlphaMode = Material::ALPHA_MODE_MASK;
 
         }
         if (mat.additionalValues.find("alphaCutoff") != mat.additionalValues.end())
         {
             material.mAlphaCutoff = static_cast<float>(mat.additionalValues["alphaCutoff"].Factor());
         }
-
+        material.m_bDoubleSided = mat.doubleSided;
         mMaterials.push_back(material);
     }
     // Push a default material at the end of the list for meshes with no material assigned
@@ -1358,6 +1358,7 @@ void LeoRenderer::GLTFModel::DrawNode(
     VkPipelineLayout pipelineLayout,
     uint32_t bindImageSet)
 {
+    if (!node->visible) return;
     if (node->mMesh)
     {
         for (auto primitive : node->mMesh->mPrimitives)
@@ -1365,9 +1366,9 @@ void LeoRenderer::GLTFModel::DrawNode(
             bool skip = false;
             const LeoRenderer::Material& material = primitive->mMaterial;
 
-            if (renderFlags & RenderFlags::RenderOpaqueNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_OPAQUE);
-            if (renderFlags & RenderFlags::RenderAlphaMaskedNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_MASK);
-            if (renderFlags & RenderFlags::RenderAlphaBlendedNodes) skip = (material.mAlphaMode != Material::ALPHAMODE_BLEND);
+            if (renderFlags & RenderFlags::RenderOpaqueNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_OPAQUE);
+            if (renderFlags & RenderFlags::RenderAlphaMaskedNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_MASK);
+            if (renderFlags & RenderFlags::RenderAlphaBlendedNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_BLEND);
 
             if (!skip)
             {

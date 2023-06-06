@@ -42,14 +42,17 @@ namespace LeoRenderer
         explicit Material(vks::VulkanDevice* device) : mDevice(device) {};
         void CreateDescSet(VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, uint32_t descriptorBindingFlags);
 
-        enum AlphaMode {
-            ALPHAMODE_OPAQUE,
-            ALPHAMODE_MASK,
-            ALPHAMODE_BLEND };
+        enum AlphaMode
+        {
+            ALPHA_MODE_OPAQUE,
+            ALPHA_MODE_MASK,
+            ALPHA_MODE_BLEND
+        } eAlphaMode;
 
         vks::VulkanDevice*  mDevice = nullptr;
-        AlphaMode           mAlphaMode = ALPHAMODE_OPAQUE;
+        AlphaMode           mAlphaMode = ALPHA_MODE_OPAQUE;
         float               mAlphaCutoff = 1.0f;
+        bool                m_bDoubleSided = false;
         float               mMetallicFactor = 1.0f;
         float               mRoughnessFactor = 1.0f;
         glm::vec4           mBaseColorFactor = glm::vec4(1.0f);
@@ -130,6 +133,7 @@ namespace LeoRenderer
         void Update();
         ~Node();
 
+        bool                visible = true;
         Node*               mParent;
         uint32_t            mIndex;
         std::vector<Node*>  mChildren;
