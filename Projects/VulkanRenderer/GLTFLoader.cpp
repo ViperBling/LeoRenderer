@@ -606,6 +606,7 @@ LeoRenderer::GLTFModel::~GLTFModel()
     for (auto texture : mTextures) texture.OnDestroy();
     for (auto node : mNodes) delete node;
     for (auto skin : mSkins) delete skin;
+    for (auto mat : mMaterials) vkDestroyPipeline(m_pDevice->logicalDevice, mat.mPipeline, nullptr);
 
     if (descriptorSetLayoutUBO != VK_NULL_HANDLE)
     {
@@ -1371,7 +1372,10 @@ void LeoRenderer::GLTFModel::DrawNode(
             if (!skip)
             {
                 if (renderFlags & RenderFlags::BindImages)
+                {
+                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.mPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
+                }
                 vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
             }
         }

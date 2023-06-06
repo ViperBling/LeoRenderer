@@ -60,6 +60,7 @@ namespace LeoRenderer
         Texture*            mEmissiveTexture = nullptr;
         Texture*            mSpecularGlossinessTexture = nullptr;
         Texture*            mDiffuseTexture = nullptr;
+        VkPipeline          mPipeline;
         VkDescriptorSet     mDescriptorSet{};
     };
 
