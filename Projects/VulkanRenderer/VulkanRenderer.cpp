@@ -1,6 +1,6 @@
 ﻿#include "VulkanRenderer.h"
 
-LeoRenderer::VulkanRenderer::VulkanRenderer()
+LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
 {
     title = "GLTF Test";
     camera.type = Camera::CameraType::lookat;
@@ -53,7 +53,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
         // Bind Scene Matrices Descriptor to Set 0
         vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
         // Draw
-        mScene.Draw(drawCmdBuffers[i], 0,mPipelineLayout);
+        mScene.Draw(drawCmdBuffers[i], 1,mPipelineLayout);
         DrawUI(drawCmdBuffers[i]);
 
         vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -156,8 +156,8 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
     VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);
 
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageCIs{};
-    shaderStageCIs[0] = LoadShader(getShadersPath() + "Lambert.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStageCIs[1] = LoadShader(getShadersPath() + "Lambert.vert.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    shaderStageCIs[0] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStageCIs[1] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const std::vector<VkVertexInputBindingDescription> viBindings =
     {

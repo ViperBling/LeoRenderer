@@ -1,6 +1,5 @@
 ﻿#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#define TINYGLTF_NO_STB_IMAGE_WRITE
 
 #include "GLTFLoader.h"
 
@@ -953,7 +952,7 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         mMaterials.push_back(material);
     }
     // Push a default material at the end of the list for meshes with no material assigned
-    mMaterials.emplace_back(m_pDevice);
+//    mMaterials.emplace_back(m_pDevice);
 }
 
 void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
@@ -1376,8 +1375,9 @@ void LeoRenderer::GLTFModel::DrawNode(
                 {
                     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.mPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
+                    vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+
                 }
-                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
             }
         }
     }

@@ -39,7 +39,7 @@ namespace LeoRenderer
 
     struct Material
     {
-        explicit Material(vks::VulkanDevice* device) : mDevice(device) {};
+        Material(vks::VulkanDevice* device) : mDevice(device) {};
         void CreateDescSet(VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, uint32_t descriptorBindingFlags);
 
         enum AlphaMode
