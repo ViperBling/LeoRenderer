@@ -1360,6 +1360,16 @@ void LeoRenderer::GLTFModel::DrawNode(
     if (!node->visible) return;
     if (node->mMesh)
     {
+        // 通过vkCmdPushConstant来传递变换矩阵
+        // 遍历node的层次结构，应用所有的变换
+        glm::mat4 nodeMatrix = node->mMatrix;
+        Node* currentParent = node->mParent;
+        while (currentParent)
+        {
+            nodeMatrix = currentParent->mMatrix * nodeMatrix;
+            currentParent = currentParent->mParent;
+        }
+        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &nodeMatrix);
         for (auto primitive : node->mMesh->mPrimitives)
         {
             bool skip = false;

@@ -268,7 +268,7 @@ namespace LeoRenderer
         Dimensions mDimensions;
 
         bool m_bMetallicWorkFlow = true;
-        bool m_bBufferBound = true;
+        bool m_bBufferBound = false;
         std::string mPath;
 
     private:
