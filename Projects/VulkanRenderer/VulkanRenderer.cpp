@@ -5,7 +5,7 @@ LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
     title = "GLTF Test";
     camera.type = Camera::CameraType::lookat;
     camera.flipY = true;
-    camera.setPosition(glm::vec3(0.0f, 1.0f, 0.0f));
+    camera.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
     camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
 }
@@ -52,8 +52,11 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
         vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
         // Bind Scene Matrices Descriptor to Set 0
         vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
+        // vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+        mScene.BindBuffers(drawCmdBuffers[i]);
         // Draw
-        mScene.Draw(drawCmdBuffers[i], 1,mPipelineLayout);
+        mScene.Draw(drawCmdBuffers[i]);
         DrawUI(drawCmdBuffers[i]);
 
         vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -63,7 +66,10 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 
 void LeoRenderer::VulkanRenderer::LoadGLTFFile(std::string& filename)
 {
-    mScene.LoadFromFile(filename, vulkanDevice, queue);
+    const uint32_t glTFLoadingFlags =
+        LeoRenderer::FileLoadingFlags::PreTransformVertices |
+        LeoRenderer::FileLoadingFlags::PreMultiplyVertexColors;
+    mScene.LoadFromFile(filename, vulkanDevice, queue, glTFLoadingFlags);
 }
 
 void LeoRenderer::VulkanRenderer::LoadAssets()

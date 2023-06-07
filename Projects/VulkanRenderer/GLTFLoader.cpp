@@ -551,13 +551,13 @@ VkVertexInputAttributeDescription LeoRenderer::Vertex::InputAttributeDescription
                 {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mNormal))});
         case VertexComponent::UV:
             return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mUV))});
+                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mUV))});
         case VertexComponent::Color:
             return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mColor))});
+                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mColor))});
         case VertexComponent::Tangent:
             return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mTangent))});
+                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mTangent))});
         case VertexComponent::Joint0:
             return VkVertexInputAttributeDescription(
                 {location, binding, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mJoint0))});
@@ -952,7 +952,7 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         mMaterials.push_back(material);
     }
     // Push a default material at the end of the list for meshes with no material assigned
-//    mMaterials.emplace_back(m_pDevice);
+    // mMaterials.emplace_back(m_pDevice);
 }
 
 void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
@@ -1362,13 +1362,13 @@ void LeoRenderer::GLTFModel::DrawNode(
     {
         // 通过vkCmdPushConstant来传递变换矩阵
         // 遍历node的层次结构，应用所有的变换
-        glm::mat4 nodeMatrix = node->mMatrix;
-        Node* currentParent = node->mParent;
-        while (currentParent)
-        {
-            nodeMatrix = currentParent->mMatrix * nodeMatrix;
-            currentParent = currentParent->mParent;
-        }
+        glm::mat4 nodeMatrix = node->GetMatrix();
+//        Node* currentParent = node->mParent;
+//        while (currentParent)
+//        {
+//            nodeMatrix = currentParent->mMatrix * nodeMatrix;
+//            currentParent = currentParent->mParent;
+//        }
         vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &nodeMatrix);
         for (auto primitive : node->mMesh->mPrimitives)
         {
@@ -1383,11 +1383,9 @@ void LeoRenderer::GLTFModel::DrawNode(
             {
                 if (renderFlags & RenderFlags::BindImages)
                 {
-                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.mPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
-                    vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
-
                 }
+                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
             }
         }
     }

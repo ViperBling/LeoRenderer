@@ -1,13 +1,8 @@
 #pragma once
 
 #include "ProjectPCH.h"
-
-
-
 #include "tiny_gltf.h"
-
 #include "VulkanFramework.h"
-
 #include "GLTFLoader.h"
 
 #define ENABLE_VALIDATION true
