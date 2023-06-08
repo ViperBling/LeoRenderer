@@ -56,7 +56,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 
         mScene.BindBuffers(drawCmdBuffers[i]);
         // Draw
-        mScene.Draw(drawCmdBuffers[i]);
+        mScene.Draw(drawCmdBuffers[i], 1, mPipelineLayout);
         DrawUI(drawCmdBuffers[i]);
 
         vkCmdEndRenderPass(drawCmdBuffers[i]);
