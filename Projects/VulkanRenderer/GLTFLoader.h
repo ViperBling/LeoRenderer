@@ -39,7 +39,7 @@ namespace LeoRenderer
 
     struct Material
     {
-        Material(vks::VulkanDevice* device) : mDevice(device) {};
+        explicit Material(vks::VulkanDevice* device) : mDevice(device) {};
         void CreateDescSet(VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, uint32_t descriptorBindingFlags);
 
         enum AlphaMode
@@ -63,7 +63,6 @@ namespace LeoRenderer
         Texture*            mEmissiveTexture = nullptr;
         Texture*            mSpecularGlossinessTexture = nullptr;
         Texture*            mDiffuseTexture = nullptr;
-        VkPipeline          mPipeline;
         VkDescriptorSet     mDescriptorSet{};
     };
 
@@ -233,7 +232,7 @@ namespace LeoRenderer
     class GLTFModel
     {
     public:
-        GLTFModel() {};
+        GLTFModel() = default;
         ~GLTFModel();
         void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, std::vector<uint32_t>& indexBuffer, std::vector<Vertex>& vertexBuffer, float globalScale);
         void LoadSkins(tinygltf::Model& gltfModel);
@@ -268,7 +267,7 @@ namespace LeoRenderer
         Dimensions mDimensions;
 
         bool m_bMetallicWorkFlow = true;
-        bool m_bBufferBound = true;
+        bool m_bBufferBound = false;
         std::string mPath;
 
     private:

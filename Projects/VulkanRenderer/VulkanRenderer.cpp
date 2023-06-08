@@ -12,9 +12,10 @@ LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
 
 LeoRenderer::VulkanRenderer::~VulkanRenderer()
 {
+    vkDestroyPipeline(device, mBasePipeline.masked, nullptr);
+    vkDestroyPipeline(device, mBasePipeline.opaque, nullptr);
     vkDestroyPipelineLayout(device, mPipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, mCustomDescSetLayouts.mMatrices, nullptr);
-    vkDestroyDescriptorSetLayout(device, mCustomDescSetLayouts.mTextures, nullptr);
+    vkDestroyDescriptorSetLayout(device, mDescSetLayouts, nullptr);
     mShaderData.mBuffer.destroy();
 }
 
@@ -52,13 +53,21 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
         vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
         // Bind Scene Matrices Descriptor to Set 0
         vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
-        // vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        // Draw opaque
+        vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.opaque);
+        mScene.Draw(
+            drawCmdBuffers[i],
+            LeoRenderer::RenderFlags::BindImages | LeoRenderer::RenderFlags::RenderOpaqueNodes,
+            mPipelineLayout);
 
-        mScene.BindBuffers(drawCmdBuffers[i]);
-        // Draw
-        mScene.Draw(drawCmdBuffers[i], 1, mPipelineLayout);
+        // Draw mask
+        vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.masked);
+        mScene.Draw(
+            drawCmdBuffers[i],
+            LeoRenderer::RenderFlags::BindImages | LeoRenderer::RenderFlags::RenderAlphaMaskedNodes,
+            mPipelineLayout);
+
         DrawUI(drawCmdBuffers[i]);
-
         vkCmdEndRenderPass(drawCmdBuffers[i]);
         VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
     }
@@ -66,9 +75,8 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 
 void LeoRenderer::VulkanRenderer::LoadGLTFFile(std::string& filename)
 {
-    const uint32_t glTFLoadingFlags =
-        LeoRenderer::FileLoadingFlags::PreTransformVertices |
-        LeoRenderer::FileLoadingFlags::PreMultiplyVertexColors;
+    LeoRenderer::descriptorBindingFlags = LeoRenderer::DescriptorBindingFlags::ImageBaseColor | LeoRenderer::DescriptorBindingFlags::ImageNormalMap;
+    const uint32_t glTFLoadingFlags = LeoRenderer::FileLoadingFlags::PreTransformVertices;
     mScene.LoadFromFile(filename, vulkanDevice, queue, glTFLoadingFlags);
 }
 
@@ -91,11 +99,9 @@ void LeoRenderer::VulkanRenderer::SetupDescriptors()
     std::vector<VkDescriptorPoolSize> poolSize =
     {
         vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-        vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(mScene.mMaterials.size()) * 2),
     };
     // 一个Set用于矩阵变换和逐物体材质
-    const uint32_t maxSetCount = static_cast<uint32_t>(mScene.mTextures.size()) + 1;
-    VkDescriptorPoolCreateInfo descPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSize, maxSetCount);
+    VkDescriptorPoolCreateInfo descPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSize, 1);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descPoolInfo, nullptr, &descriptorPool));
 
     // 用于传矩阵的描述符集布局
@@ -103,50 +109,26 @@ void LeoRenderer::VulkanRenderer::SetupDescriptors()
     {
         vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
     };
-    VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindings.data(), static_cast<uint32_t>(descSetLayoutBindings.size()));
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mCustomDescSetLayouts.mMatrices));
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindings);
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mDescSetLayouts));
 
-    // 材质贴图描述符集布局
-    descSetLayoutBindings =
+    // Pipeline layout
+    const std::vector<VkDescriptorSetLayout> descSetLayouts =
     {
-        // Color Map
-        vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
-        // Normal Map
-        vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+        mDescSetLayouts,
+        LeoRenderer::descriptorSetLayoutImage,
     };
-    descSetLayoutCI.pBindings = descSetLayoutBindings.data();
-    descSetLayoutCI.bindingCount = 2;
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mCustomDescSetLayouts.mTextures));
+    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), 2);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pPipelineLayoutCreateInfo, nullptr, &mPipelineLayout));
 
-    // 两个描述符集的管线布局，一个是矩阵，另一个是材质
-    std::array<VkDescriptorSetLayout, 2> descSetLayouts = { mCustomDescSetLayouts.mMatrices, mCustomDescSetLayouts.mTextures };
-    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), static_cast<uint32_t>(descSetLayouts.size()));
-    // 使用pushconstant传递矩阵
-    VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
-    pipelineLayoutCI.pushConstantRangeCount = 1;
-    pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &mPipelineLayout));
-
-    // 矩阵描述符集
-    VkDescriptorSetAllocateInfo matDescSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mCustomDescSetLayouts.mMatrices, 1);
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &matDescSetAI, &mDescSet));
-    VkWriteDescriptorSet matWriteDescSet = vks::initializers::writeDescriptorSet(mDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mShaderData.mBuffer.descriptor);
-    vkUpdateDescriptorSets(device, 1, &matWriteDescSet, 0, nullptr);
-
-    // 材质的描述符集
-    for (auto & mat : mScene.mMaterials)
+    // Descriptor set
+    VkDescriptorSetAllocateInfo descSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mDescSetLayouts, 1);
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAllocInfo, &mDescSet));
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets =
     {
-        const VkDescriptorSetAllocateInfo texDescSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mCustomDescSetLayouts.mTextures, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &texDescSetAI, &mat.mDescriptorSet));
-        VkDescriptorImageInfo colorMap = mat.mBaseColorTexture->mDescriptor;
-        VkDescriptorImageInfo normalMap = mat.mNormalTexture->mDescriptor;
-        std::vector<VkWriteDescriptorSet> writeDescSets =
-        {
-            vks::initializers::writeDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &colorMap),
-            vks::initializers::writeDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &normalMap),
-        };
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
-    }
+        vks::initializers::writeDescriptorSet(mDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mShaderData.mBuffer.descriptor),
+    };
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 }
 
 void LeoRenderer::VulkanRenderer::PreparePipelines()
@@ -165,10 +147,6 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
     shaderStageCIs[0] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     shaderStageCIs[1] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const std::vector<VkVertexInputBindingDescription> viBindings =
-    {
-        vks::initializers::vertexInputBindingDescription(0, sizeof(LeoRenderer::Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
-    };
     std::vector<LeoRenderer::VertexComponent> vertexComponents =
     {
         LeoRenderer::VertexComponent::Position,
@@ -177,8 +155,7 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
         LeoRenderer::VertexComponent::Color,
         LeoRenderer::VertexComponent::Tangent,
     };
-    const std::vector<VkVertexInputAttributeDescription> viAttributes = LeoRenderer::Vertex::InputAttributeDescriptions(0, vertexComponents);
-    VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(viBindings, viAttributes);
+    VkPipelineVertexInputStateCreateInfo viStateCI = *LeoRenderer::Vertex::GetPipelineVertexInputState(vertexComponents);
 
     VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(mPipelineLayout, renderPass, 0);
     pipelineCI.pInputAssemblyState = &iaStateCI;
@@ -213,7 +190,10 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
 
         rsStateCI.cullMode = mat.m_bDoubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
 
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mat.mPipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+            device, pipelineCache, 1,
+            &pipelineCI, nullptr,
+            matSpecialData.alphaMask ? &mBasePipeline.opaque : &mBasePipeline.masked));
     }
 }
 

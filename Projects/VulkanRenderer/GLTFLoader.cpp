@@ -485,7 +485,7 @@ glm::mat4 LeoRenderer::Node::GetMatrix()
     LeoRenderer::Node* p = mParent;
     while (p)
     {
-        localMat = p->LocalMatrix();
+        localMat = p->LocalMatrix() * localMat;
         p = p->mParent;
     }
     return localMat;
@@ -605,7 +605,6 @@ LeoRenderer::GLTFModel::~GLTFModel()
     for (auto texture : mTextures) texture.OnDestroy();
     for (auto node : mNodes) delete node;
     for (auto skin : mSkins) delete skin;
-    for (auto mat : mMaterials) vkDestroyPipeline(m_pDevice->logicalDevice, mat.mPipeline, nullptr);
 
     if (descriptorSetLayoutUBO != VK_NULL_HANDLE)
     {
@@ -1360,16 +1359,6 @@ void LeoRenderer::GLTFModel::DrawNode(
     if (!node->visible) return;
     if (node->mMesh)
     {
-        // 通过vkCmdPushConstant来传递变换矩阵
-        // 遍历node的层次结构，应用所有的变换
-        glm::mat4 nodeMatrix = node->GetMatrix();
-//        Node* currentParent = node->mParent;
-//        while (currentParent)
-//        {
-//            nodeMatrix = currentParent->mMatrix * nodeMatrix;
-//            currentParent = currentParent->mParent;
-//        }
-        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &nodeMatrix);
         for (auto primitive : node->mMesh->mPrimitives)
         {
             bool skip = false;
@@ -1383,7 +1372,6 @@ void LeoRenderer::GLTFModel::DrawNode(
             {
                 if (renderFlags & RenderFlags::BindImages)
                 {
-                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, material.mPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
                 }
                 vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);

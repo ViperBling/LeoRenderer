@@ -16,6 +16,7 @@ namespace LeoRenderer
         {
             glm::mat4 projection;
             glm::mat4 view;
+            glm::mat4 model = glm::mat4(1.0f);
             glm::vec4 lightPos = glm::vec4(0.0f, 2.5f, 0.0f, 1.0f);
             glm::vec4 viewPos;
         } mValues;
@@ -25,6 +26,12 @@ namespace LeoRenderer
     {
         VkDescriptorSetLayout mMatrices;
         VkDescriptorSetLayout mTextures;
+    };
+
+    struct Pipelines
+    {
+        VkPipeline opaque;
+        VkPipeline masked;
     };
 
     class VulkanRenderer : public VulkanFramework
@@ -48,10 +55,12 @@ namespace LeoRenderer
     public:
         LeoRenderer::GLTFModel mScene;
 
+        Pipelines mBasePipeline;
+
         ShaderData mShaderData;
-        DescriptorSetLayouts mCustomDescSetLayouts;
 
         VkPipelineLayout mPipelineLayout;
         VkDescriptorSet mDescSet;
+        VkDescriptorSetLayout mDescSetLayouts;
     };
 }
