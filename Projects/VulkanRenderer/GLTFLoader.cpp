@@ -764,7 +764,8 @@ void LeoRenderer::GLTFModel::LoadNode(
                     vert.mPos = glm::vec4(glm::make_vec3(&bufferPos[v * 3]), 1.0f);
                     vert.mNormal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * 3]) : glm::vec3(0.0f)));
                     vert.mUV = bufferTexCoords ? glm::make_vec2(&bufferTexCoords[v * 2]) : glm::vec3(0.0f);
-                    if (bufferColors) {
+                    if (bufferColors)
+                    {
                         switch (numColorComponents)
                         {
                             case 3:

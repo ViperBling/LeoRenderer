@@ -22,12 +22,6 @@ namespace LeoRenderer
         } mValues;
     };
 
-    struct DescriptorSetLayouts
-    {
-        VkDescriptorSetLayout mMatrices;
-        VkDescriptorSetLayout mTextures;
-    };
-
     struct Pipelines
     {
         VkPipeline opaque;

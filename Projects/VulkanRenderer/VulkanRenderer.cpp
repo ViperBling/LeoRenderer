@@ -5,7 +5,7 @@ LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
     title = "GLTF Test";
     camera.type = Camera::CameraType::lookat;
     camera.flipY = true;
-    camera.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    camera.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
     camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
     camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
 }
@@ -255,7 +255,7 @@ void LeoRenderer::VulkanRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 
     // POI: Create a list of glTF nodes for visibility toggle
     ImGui::BeginChild("#Nodelist", ImVec2(200.0f * overlay->scale, 340.0f * overlay->scale), false);
-    for (auto& node : mScene.mNodes)
+    for (auto & node : mScene.mLinearNodes)
     {
         if (overlay->checkBox(node->mName.c_str(), &node->visible))
         {
