@@ -53,18 +53,19 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
         vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
         // Bind Scene Matrices Descriptor to Set 0
         vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
+
         // Draw opaque
         vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.opaque);
         mScene.Draw(
             drawCmdBuffers[i],
-            LeoRenderer::RenderFlags::BindImages | LeoRenderer::RenderFlags::RenderOpaqueNodes,
+            LeoRenderer::BindImages,
             mPipelineLayout);
 
         // Draw mask
         vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.masked);
         mScene.Draw(
             drawCmdBuffers[i],
-            LeoRenderer::RenderFlags::BindImages | LeoRenderer::RenderFlags::RenderAlphaMaskedNodes,
+            LeoRenderer::BindImages,
             mPipelineLayout);
 
         DrawUI(drawCmdBuffers[i]);
@@ -76,7 +77,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 void LeoRenderer::VulkanRenderer::LoadGLTFFile(std::string& filename)
 {
     LeoRenderer::descriptorBindingFlags = LeoRenderer::DescriptorBindingFlags::ImageBaseColor | LeoRenderer::DescriptorBindingFlags::ImageNormalMap;
-    const uint32_t glTFLoadingFlags = LeoRenderer::FileLoadingFlags::PreTransformVertices;
+    const uint32_t glTFLoadingFlags = LeoRenderer::FileLoadingFlags::PreTransformVertices | LeoRenderer::FileLoadingFlags::PreMultiplyVertexColors;
     mScene.LoadFromFile(filename, vulkanDevice, queue, glTFLoadingFlags);
 }
 
@@ -193,7 +194,7 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
         VK_CHECK_RESULT(vkCreateGraphicsPipelines(
             device, pipelineCache, 1,
             &pipelineCI, nullptr,
-            matSpecialData.alphaMask ? &mBasePipeline.opaque : &mBasePipeline.masked));
+            matSpecialData.alphaMask ? &mBasePipeline.masked : &mBasePipeline.opaque));
     }
 }
 

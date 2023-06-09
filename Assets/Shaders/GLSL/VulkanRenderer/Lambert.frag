@@ -12,8 +12,8 @@ layout (location = 5) in vec4 inTangent;
 
 layout (location = 0) out vec4 outFragColor;
 
-layout (constant_id = 0) const bool ALPHA_MASK = true;
-layout (constant_id = 1) const float ALPHA_MASK_CUTOFF = 0.3f;
+layout (constant_id = 0) const bool ALPHA_MASK = false;
+layout (constant_id = 1) const float ALPHA_MASK_CUTOFF = 0.0f;
 
 void main()
 {
