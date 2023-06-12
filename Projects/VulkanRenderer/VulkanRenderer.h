@@ -32,7 +32,7 @@ namespace LeoRenderer
     {
     public:
         VulkanRenderer();
-        ~VulkanRenderer() override;
+        virtual ~VulkanRenderer();
         void GetEnabledFeatures() override;
         void BuildCommandBuffers() override;
         void LoadGLTFFile(std::string& filename);

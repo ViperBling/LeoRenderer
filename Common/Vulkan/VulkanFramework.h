@@ -201,8 +201,8 @@ public:
 	Camera camera;
 	glm::vec2 mousePos;
 
-	std::string title = "Vulkan Example";
-	std::string name = "vulkanExample";
+	std::string title = "Vulkan Framework";
+	std::string name = "vulkanFramework";
 	uint32_t apiVersion = VK_API_VERSION_1_2;
 
 	struct {
