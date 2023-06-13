@@ -8,6 +8,7 @@ LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
     camera.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
     camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
     camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
+    settings.multiSampling = true;
 }
 
 LeoRenderer::VulkanRenderer::~VulkanRenderer()
@@ -28,10 +29,19 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 {
     VkCommandBufferBeginInfo cmdBI = vks::initializers::commandBufferBeginInfo();
 
-    VkClearValue clearValues[2];
-    clearValues[0].color = defaultClearColor;
-    clearValues[0].color = { {0.1f, 0.1f, 0.1f, 1.0f} };
-    clearValues[1].depthStencil = {1.0f, 0};
+    VkClearValue clearValues[3];
+    if (settings.multiSampling)
+    {
+        clearValues[0].color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
+        clearValues[1].color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
+        clearValues[2].depthStencil = { 1.0f, 0 };
+    }
+    else
+    {
+        clearValues[0].color = defaultClearColor;
+        clearValues[0].color = { {0.1f, 0.1f, 0.1f, 1.0f} };
+        clearValues[1].depthStencil = {1.0f, 0};
+    }
 
     VkRenderPassBeginInfo renderPassBI = vks::initializers::renderPassBeginInfo();
     renderPassBI.renderPass = renderPass;
@@ -39,7 +49,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
     renderPassBI.renderArea.offset.y = 0;
     renderPassBI.renderArea.extent.width = width;
     renderPassBI.renderArea.extent.height = height;
-    renderPassBI.clearValueCount = 2;
+    renderPassBI.clearValueCount = settings.multiSampling ? 3 : 2;
     renderPassBI.pClearValues = clearValues;
 
     const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
@@ -140,7 +150,7 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
     VkPipelineColorBlendStateCreateInfo cbStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(1, &cbAttachState);
     VkPipelineDepthStencilStateCreateInfo dsStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
     VkPipelineViewportStateCreateInfo vpStateCI = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-    VkPipelineMultisampleStateCreateInfo msStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+    VkPipelineMultisampleStateCreateInfo msStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(settings.multiSampling ?  settings.sampleCount : VK_SAMPLE_COUNT_1_BIT, 0);
     const std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);
 

@@ -70,6 +70,7 @@ private:
 	void setupSwapChain();
 	void createCommandBuffers();
 	void destroyCommandBuffers();
+    void setupRenderTarget(VkImage* image, VkImageView* imageView, VkDeviceMemory* memory, bool isDepth);
 	std::string shaderDir = "GLSL";
 
     struct RenderTarget
