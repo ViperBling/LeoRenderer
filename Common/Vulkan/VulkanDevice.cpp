@@ -593,4 +593,11 @@ namespace vks
 		throw std::runtime_error("Could not find a matching depth format");
 	}
 
+    void VulkanDevice::beginCommandBuffer(VkCommandBuffer cmdBuffer)
+    {
+        VkCommandBufferBeginInfo cmdBufferBI{};
+        cmdBufferBI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufferBI));
+    }
+
 };

@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
-#include <assert.h>
+#include <cassert>
 #include <stdio.h>
 #include <vector>
 

@@ -58,7 +58,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
         vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.opaque);
         mScene.Draw(
             drawCmdBuffers[i],
-            LeoRenderer::BindImages,
+            LeoRenderer::BindImages | LeoRenderer::RenderOpaqueNodes,
             mPipelineLayout);
 
         // Draw mask

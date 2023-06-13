@@ -14,7 +14,7 @@
 #include "VulkanTools.h"
 #include "vulkan/vulkan.h"
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 #include <exception>
 
 namespace vks
@@ -67,5 +67,6 @@ struct VulkanDevice
 	void            flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free = true);
 	bool            extensionSupported(std::string extension);
 	VkFormat        getSupportedDepthFormat(bool checkSamplingSupport);
+    void            beginCommandBuffer(VkCommandBuffer cmdBuffer);
 };
 }        // namespace vks

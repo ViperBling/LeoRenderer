@@ -11,6 +11,10 @@
 
 #include "vulkan/vulkan.h"
 #include "VulkanDevice.h"
+#include "VulkanTexture.h"
+#include "VulkanFramework.h"
+#include "GLTFLoader.h"
+#include "VulkanUIOverlay.h"
 
 #include <ktx.h>
 #include <ktxvulkan.h>
