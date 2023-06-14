@@ -932,6 +932,10 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         {
             material.mEmissiveTexture = GetTexture(gltfModel.textures[mat.additionalValues["emissiveTexture"].TextureIndex()].source);
         }
+        if (mat.additionalValues.find("emissiveFactor") != mat.additionalValues.end())
+        {
+            material.mEmissiveFactor = glm::vec4(glm::make_vec3(mat.additionalValues["emissiveFactor"].ColorFactor().data()), 1.0);
+        }
         if (mat.additionalValues.find("occlusionTexture") != mat.additionalValues.end())
         {
             material.mOcclusionTexture = GetTexture(gltfModel.textures[mat.additionalValues["occlusionTexture"].TextureIndex()].source);

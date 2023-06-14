@@ -47,7 +47,7 @@ namespace LeoRenderer
             ALPHA_MODE_OPAQUE,
             ALPHA_MODE_MASK,
             ALPHA_MODE_BLEND
-        } eAlphaMode;
+        };
 
         vks::VulkanDevice*  mDevice = nullptr;
         AlphaMode           mAlphaMode = ALPHA_MODE_OPAQUE;
@@ -55,6 +55,7 @@ namespace LeoRenderer
         bool                m_bDoubleSided = false;
         float               mMetallicFactor = 1.0f;
         float               mRoughnessFactor = 1.0f;
+        glm::vec4           mEmissiveFactor = glm::vec4(1.0f);
         glm::vec4           mBaseColorFactor = glm::vec4(1.0f);
         Texture*            mBaseColorTexture = nullptr;
         Texture*            mMetallicRoughnessTexture = nullptr;
