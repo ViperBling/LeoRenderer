@@ -82,7 +82,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
 
             // Push constant
             PushConstantBlockMaterial pushConstantBlockMat{};
-            pushConstantBlockMat.mFactorEmissive = primitive->mMaterial.mEmissive;
+            pushConstantBlockMat.mFactorEmissive = primitive->mMaterial.mEmissiveFactor;
         }
     }
 }
