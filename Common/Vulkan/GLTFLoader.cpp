@@ -400,46 +400,46 @@ void LeoRenderer::Texture::FromGLTFImage(
 }
 
 
-void LeoRenderer::Material::CreateDescSet(
-    VkDescriptorPool descriptorPool,
-    VkDescriptorSetLayout descriptorSetLayout,
-    uint32_t descBindFlags)
-{
-    VkDescriptorSetAllocateInfo descSetAllocInfo{};
-    descSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descSetAllocInfo.descriptorPool = descriptorPool;
-    descSetAllocInfo.pSetLayouts = &descriptorSetLayout;
-    descSetAllocInfo.descriptorSetCount = 1;
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(mDevice->logicalDevice, &descSetAllocInfo, &mDescriptorSet));
-
-    std::vector<VkDescriptorImageInfo> imageDescs{};
-    std::vector<VkWriteDescriptorSet> writeDescSets{};
-    if (descBindFlags & DescriptorBindingFlags::ImageBaseColor)
-    {
-        imageDescs.push_back(mBaseColorTexture->mDescriptor);
-        VkWriteDescriptorSet writeDescSet{};
-        writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeDescSet.descriptorCount = 1;
-        writeDescSet.dstSet = mDescriptorSet;
-        writeDescSet.dstBinding = static_cast<uint32_t>(writeDescSets.size());
-        writeDescSet.pImageInfo = &mBaseColorTexture->mDescriptor;
-        writeDescSets.push_back(writeDescSet);
-    }
-    if (mNormalTexture && descBindFlags & DescriptorBindingFlags::ImageNormalMap)
-    {
-        imageDescs.push_back(mNormalTexture->mDescriptor);
-        VkWriteDescriptorSet writeDescSet{};
-        writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeDescSet.descriptorCount = 1;
-        writeDescSet.dstSet = mDescriptorSet;
-        writeDescSet.dstBinding = static_cast<uint32_t>(writeDescSets.size());
-        writeDescSet.pImageInfo = &mNormalTexture->mDescriptor;
-        writeDescSets.push_back(writeDescSet);
-    }
-    vkUpdateDescriptorSets(mDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
-}
+//void LeoRenderer::Material::CreateDescSet(
+//    VkDescriptorPool descriptorPool,
+//    VkDescriptorSetLayout descriptorSetLayout,
+//    uint32_t descBindFlags)
+//{
+//    VkDescriptorSetAllocateInfo descSetAllocInfo{};
+//    descSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+//    descSetAllocInfo.descriptorPool = descriptorPool;
+//    descSetAllocInfo.pSetLayouts = &descriptorSetLayout;
+//    descSetAllocInfo.descriptorSetCount = 1;
+//    VK_CHECK_RESULT(vkAllocateDescriptorSets(mDevice->logicalDevice, &descSetAllocInfo, &mDescriptorSet));
+//
+//    std::vector<VkDescriptorImageInfo> imageDescs{};
+//    std::vector<VkWriteDescriptorSet> writeDescSets{};
+//    if (descBindFlags & DescriptorBindingFlags::ImageBaseColor)
+//    {
+//        imageDescs.push_back(mBaseColorTexture->mDescriptor);
+//        VkWriteDescriptorSet writeDescSet{};
+//        writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+//        writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//        writeDescSet.descriptorCount = 1;
+//        writeDescSet.dstSet = mDescriptorSet;
+//        writeDescSet.dstBinding = static_cast<uint32_t>(writeDescSets.size());
+//        writeDescSet.pImageInfo = &mBaseColorTexture->mDescriptor;
+//        writeDescSets.push_back(writeDescSet);
+//    }
+//    if (mNormalTexture && descBindFlags & DescriptorBindingFlags::ImageNormalMap)
+//    {
+//        imageDescs.push_back(mNormalTexture->mDescriptor);
+//        VkWriteDescriptorSet writeDescSet{};
+//        writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+//        writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//        writeDescSet.descriptorCount = 1;
+//        writeDescSet.dstSet = mDescriptorSet;
+//        writeDescSet.dstBinding = static_cast<uint32_t>(writeDescSets.size());
+//        writeDescSet.pImageInfo = &mNormalTexture->mDescriptor;
+//        writeDescSets.push_back(writeDescSet);
+//    }
+//    vkUpdateDescriptorSets(mDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+//}
 
 void LeoRenderer::Primitive::SetDimensions(glm::vec3 min, glm::vec3 max)
 {
@@ -897,7 +897,7 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
 {
     for (tinygltf::Material &mat : gltfModel.materials)
     {
-        LeoRenderer::Material material(m_pDevice);
+        LeoRenderer::Material material{};
 
         if (mat.values.find("baseColorTexture") != mat.values.end())
         {
