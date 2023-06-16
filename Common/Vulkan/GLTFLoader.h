@@ -42,7 +42,7 @@ namespace LeoRenderer
     {
         void UpdateDescriptor();
         void OnDestroy();
-        void FromGLTFImage(tinygltf::Image& gltfImage, std::string path, vks::VulkanDevice* device, VkQueue copyQueue);
+        void FromGLTFImage(tinygltf::Image& gltfImage, TextureSampler texSampler, vks::VulkanDevice* device, VkQueue copyQueue);
 
         vks::VulkanDevice*      mDevice = nullptr;
         VkImage                 mImage{};
@@ -238,8 +238,8 @@ namespace LeoRenderer
 
     struct LoaderInfo
     {
-        uint32_t*   mIndexBuffer;
-        Vertex*     mVertexBuffer;
+        uint32_t*   mIndexBuffer{};
+        Vertex*     mVertexBuffer{};
         size_t      mIndexPos = 0;
         size_t      mVertexPos = 0;
     };
@@ -249,21 +249,23 @@ namespace LeoRenderer
     public:
         GLTFModel() = default;
         ~GLTFModel();
-        void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, std::vector<uint32_t>& indexBuffer, std::vector<Vertex>& vertexBuffer, float globalScale);
+        void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, LoaderInfo& loaderInfo, float globalScale);
+        void GetNodeProperpty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
         void LoadSkins(tinygltf::Model& gltfModel);
-        void LoadImages(tinygltf::Model& gltfModel, vks::VulkanDevice* device, VkQueue transferQueue);
+        void LoadTextures(tinygltf::Model& gltfModel, vks::VulkanDevice* device, VkQueue transferQueue);
+        VkSamplerAddressMode GetVkWrapMode(int32_t wrapMode);
+        VkFilter GetVkFilterMode(int32_t filterMode);
+        void LoadeTextureSamplers(tinygltf::Model& gltfModel);
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);
-        void LoadFromFile(std::string& filename, vks::VulkanDevice* device, VkQueue transferQueue, uint32_t fileLoadingFlags = LeoRenderer::FileLoadingFlags::None, float scale = 1.0f);
-        void BindBuffers(VkCommandBuffer commandBuffer);
-        void DrawNode(Node* node, VkCommandBuffer commandBuffer, uint32_t renderFlags = 0, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);
-        void Draw(VkCommandBuffer commandBuffer, uint32_t renderFlags = 0, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);
-        void GetNodeDimensions(Node* node, glm::vec3& min, glm::vec3& max);
+        void LoadFromFile(std::string& filename, vks::VulkanDevice* device, VkQueue transferQueue, float scale = 1.0f);
+        void DrawNode(Node* node, VkCommandBuffer commandBuffer);
+        void Draw(VkCommandBuffer commandBuffer);
+        void CalculateBoundingBox(Node* node, Node* parent);
         void GetSceneDimensions();
         void UpdateAnimation(uint32_t index, float time);
         Node* FindNode(Node* parent, uint32_t index);
         Node* NodeFromIndex(uint32_t index);
-        void PrepareNodeDescriptor(LeoRenderer::Node* node, VkDescriptorSetLayout descriptorSetLayout);
 
     public:
         vks::VulkanDevice* m_pDevice;
@@ -285,18 +287,9 @@ namespace LeoRenderer
 
         Dimensions mDimensions;
 
-
-
         bool m_bMetallicWorkFlow = true;
         bool m_bBufferBound = false;
         std::string mPath;
-
-    private:
-        LeoRenderer::Texture* GetTexture(uint32_t index);
-        void CreateEmptyTexture(VkQueue transferQueue);
-
-    private:
-        LeoRenderer::Texture mEmptyTexture;
     };
 }
 
