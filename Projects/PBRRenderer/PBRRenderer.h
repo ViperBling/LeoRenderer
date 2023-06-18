@@ -3,6 +3,7 @@
 #include "ProjectPCH.h"
 
 #define ENABLE_VALIDATION true
+#define ENABLE_MSAA true
 
 struct Textures
 {

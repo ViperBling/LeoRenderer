@@ -1,13 +1,8 @@
-//
-// Created by Administrator on 2023/6/13.
-//
-
 #include "PBRRenderer.h"
 
-PBRRenderer::PBRRenderer() : VulkanFramework(ENABLE_VALIDATION)
+PBRRenderer::PBRRenderer() : VulkanFramework(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     title = "PBRRenderer";
-
 }
 
 PBRRenderer::~PBRRenderer()
@@ -83,6 +78,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
             // Push constant
             PushConstantBlockMaterial pushConstantBlockMat{};
             pushConstantBlockMat.mFactorEmissive = primitive->mMaterial.mEmissiveFactor;
+            pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mNormalTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mNormal : -1;
         }
     }
 }
