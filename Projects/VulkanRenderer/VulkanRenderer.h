@@ -6,6 +6,7 @@
 #include "GLTFLoader.h"
 
 #define ENABLE_VALIDATION true
+#define ENABLE_MSAA true
 
 namespace LeoRenderer
 {

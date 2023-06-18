@@ -285,7 +285,7 @@ void VulkanGLTFLoader::Draw(VkCommandBuffer cmdBuffer, VkPipelineLayout pipeline
 }
 
 
-TestGLTFLoader::TestGLTFLoader() : VulkanFramework(ENABLE_VALIDATION)
+TestGLTFLoader::TestGLTFLoader() : VulkanFramework(false, ENABLE_VALIDATION)
 {
     title = "GLTFLoader";
     camera.type = Camera::CameraType::lookat;
@@ -499,7 +499,7 @@ void TestGLTFLoader::PreparePipelines()
     VkPipelineColorBlendStateCreateInfo colorBlendStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentStateCI);
     VkPipelineDepthStencilStateCreateInfo depthStencilStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
     VkPipelineViewportStateCreateInfo viewportStateCI = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-    VkPipelineMultisampleStateCreateInfo multisampleStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+    VkPipelineMultisampleStateCreateInfo multisampleStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(settings.sampleCount, 0);
 
     const std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);

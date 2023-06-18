@@ -817,7 +817,7 @@ void VulkanFramework::SubmitFrame()
 	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
-VulkanFramework::VulkanFramework(bool enableValidation)
+VulkanFramework::VulkanFramework(bool msaa, bool enableValidation)
 {
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
 	// Check for a valid asset path
@@ -834,8 +834,10 @@ VulkanFramework::VulkanFramework(bool enableValidation)
 	}
 #endif
 
+    settings.multiSampling = msaa;
+    settings.sampleCount = msaa ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
 	settings.validation = enableValidation;
-    UIOverlay.rasterizationSamples = settings.multiSampling ? settings.sampleCount : VK_SAMPLE_COUNT_1_BIT;
+    UIOverlay.rasterizationSamples = settings.sampleCount;
 	
 	// Command line arguments
 	commandLineParser.add("help", { "--help" }, 0, "Show help");

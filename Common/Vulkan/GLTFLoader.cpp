@@ -320,18 +320,14 @@ void LeoRenderer::Texture::FromGLTFImage(
     if (deleteBuffer) delete[] buffer;
 }
 
-
-
-void LeoRenderer::Primitive::SetDimensions(glm::vec3 min, glm::vec3 max)
+void LeoRenderer::Primitive::SetBoundingBox(glm::vec3 min, glm::vec3 max)
 {
-    mDimensions.min = min;
-    mDimensions.max = max;
-    mDimensions.size = max - min;
-    mDimensions.center = (min + max) / 2.0f;
-    mDimensions.radius = glm::distance(min, max) / 2.0f;
+    mBBox.mMin = min;
+    mBBox.mMax = max;
+    mBBox.mbValid = true;
 }
 
-
+// ============================== Mesh ==============================
 LeoRenderer::Mesh::Mesh(vks::VulkanDevice *device, glm::mat4 matrix)
 {
     mDevice = device;
@@ -354,7 +350,14 @@ LeoRenderer::Mesh::~Mesh()
     for (auto primitive : mPrimitives) delete primitive;
 }
 
-// gltf Node
+void LeoRenderer::Mesh::SetBoundingBox(glm::vec3 min, glm::vec3 max)
+{
+    mBBox.mMin = min;
+    mBBox.mMax = max;
+    mBBox.mbValid = true;
+}
+
+// ============================== Node ==============================
 glm::mat4 LeoRenderer::Node::LocalMatrix()
 {
     return glm::translate(glm::mat4(1.0f), mTranslation) * glm::mat4(mRotation) * glm::scale(glm::mat4(1.0f), mScale) * mMatrix;
@@ -406,108 +409,36 @@ LeoRenderer::Node::~Node()
     for (auto& child : mChildren) delete child;
 }
 
-/*
-	glTF default vertex layout with easy Vulkan mapping functions
-*/
-
-VkVertexInputBindingDescription LeoRenderer::Vertex::mVertexInputBindingDescription;
-std::vector<VkVertexInputAttributeDescription> LeoRenderer::Vertex::mVertexInputAttributeDescriptions;
-VkPipelineVertexInputStateCreateInfo LeoRenderer::Vertex::mPipelineVertexInputStateCreateInfo;
-
-VkVertexInputBindingDescription LeoRenderer::Vertex::InputBindingDescription(uint32_t binding)
-{
-    return VkVertexInputBindingDescription({binding, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
-}
-
-VkVertexInputAttributeDescription LeoRenderer::Vertex::InputAttributeDescription(
-    uint32_t binding, uint32_t location, LeoRenderer::VertexComponent component)
-{
-    switch(component)
-    {
-        case VertexComponent::Position:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mPos))});
-        case VertexComponent::Normal:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mNormal))});
-        case VertexComponent::UV:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mUV))});
-        case VertexComponent::Color:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mColor))});
-        case VertexComponent::Tangent:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mTangent))});
-        case VertexComponent::Joint0:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mJoint0))});
-        case VertexComponent::Weight0:
-            return VkVertexInputAttributeDescription(
-                {location, binding, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, mWeight0))});
-        default:
-            return VkVertexInputAttributeDescription({});
-    }
-}
-
-std::vector<VkVertexInputAttributeDescription> LeoRenderer::Vertex::InputAttributeDescriptions(
-    uint32_t binding, const std::vector<VertexComponent>& components)
-{
-    std::vector<VkVertexInputAttributeDescription> res;
-    uint32_t location = 0;
-    for (VertexComponent component : components)
-    {
-        res.push_back(Vertex::InputAttributeDescription(binding, location, component));
-        location++;
-    }
-    return res;
-}
-
-VkPipelineVertexInputStateCreateInfo * LeoRenderer::Vertex::GetPipelineVertexInputState(const std::vector<VertexComponent>& components)
-{
-    mVertexInputBindingDescription = Vertex::InputBindingDescription(0);
-    Vertex::mVertexInputAttributeDescriptions = Vertex::InputAttributeDescriptions(0, components);
-    mPipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    mPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
-    mPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &Vertex::mVertexInputBindingDescription;
-    mPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(Vertex::mVertexInputAttributeDescriptions.size());
-    mPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = Vertex::mVertexInputAttributeDescriptions.data();
-    return &mPipelineVertexInputStateCreateInfo;
-}
+// // ============================== Model ==============================
 
 
 LeoRenderer::GLTFModel::~GLTFModel()
 {
-    vkDestroyBuffer(m_pDevice->logicalDevice, mVertices.buffer, nullptr);
-    vkFreeMemory(m_pDevice->logicalDevice, mVertices.memory, nullptr);
-    vkDestroyBuffer(m_pDevice->logicalDevice, mIndices.buffer, nullptr);
-    vkFreeMemory(m_pDevice->logicalDevice, mIndices.memory, nullptr);
+    if (mVertices.mVBuffer != VK_NULL_HANDLE)
+    {
+        vkDestroyBuffer(m_pDevice->logicalDevice, mVertices.mVBuffer, nullptr);
+        vkFreeMemory(m_pDevice->logicalDevice, mVertices.mVMemory, nullptr);
+        mVertices.mVBuffer = VK_NULL_HANDLE;
+    }
+    if (mIndices.mIBuffer != VK_NULL_HANDLE)
+    {
+        vkDestroyBuffer(m_pDevice->logicalDevice, mIndices.mIBuffer, nullptr);
+        vkFreeMemory(m_pDevice->logicalDevice, mIndices.mIMemory, nullptr);
+        mIndices.mIBuffer = VK_NULL_HANDLE;
+    }
 
     for (auto texture : mTextures) texture.OnDestroy();
     for (auto node : mNodes) delete node;
     for (auto skin : mSkins) delete skin;
-
-    if (descriptorSetLayoutUBO != VK_NULL_HANDLE)
-    {
-        vkDestroyDescriptorSetLayout(m_pDevice->logicalDevice, descriptorSetLayoutUBO, nullptr);
-        descriptorSetLayoutUBO = VK_NULL_HANDLE;
-    }
-    if (descriptorSetLayoutImage != VK_NULL_HANDLE)
-    {
-        vkDestroyDescriptorSetLayout(m_pDevice->logicalDevice, descriptorSetLayoutImage, nullptr);
-        descriptorSetLayoutImage = VK_NULL_HANDLE;
-    }
-    vkDestroyDescriptorPool(m_pDevice->logicalDevice, mDescPool, nullptr);
-    mEmptyTexture.OnDestroy();
 }
 
 void LeoRenderer::GLTFModel::LoadNode(
-    LeoRenderer::Node *parent,
-    const tinygltf::Node &node,
+    LeoRenderer::Node* parent,
+    const tinygltf::Node& node,
     uint32_t nodeIndex,
-    const tinygltf::Model &model,
-    std::vector<uint32_t> &indexBuffer,
-    std::vector<Vertex> &vertexBuffer, float globalScale)
+    const tinygltf::Model& model,
+    LoaderInfo& loaderInfo,
+    float globalScale)
 {
     auto newNode = new LeoRenderer::Node{};
     newNode->mIndex = nodeIndex;
@@ -548,7 +479,7 @@ void LeoRenderer::GLTFModel::LoadNode(
     {
         for (int i : node.children)
         {
-            LoadNode(newNode, model.nodes[i], i, model, indexBuffer, vertexBuffer, globalScale);
+            LoadNode(newNode, model.nodes[i], i, model, loaderInfo, globalScale);
         }
     }
 
@@ -559,26 +490,37 @@ void LeoRenderer::GLTFModel::LoadNode(
         newMesh->mName = mesh.name;
         for (const auto & primitive : mesh.primitives)
         {
-            if (primitive.indices < 0) {
-                continue;
-            }
-            auto indexStart = static_cast<uint32_t>(indexBuffer.size());
-            auto vertexStart = static_cast<uint32_t>(vertexBuffer.size());
+            auto indexStart = static_cast<uint32_t>(loaderInfo.mVertexPos);
+            auto vertexStart = static_cast<uint32_t>(loaderInfo.mIndexPos);
             uint32_t indexCount = 0;
             uint32_t vertexCount = 0;
             glm::vec3 posMin{};
             glm::vec3 posMax{};
             bool hasSkin = false;
+            bool hasIndices = primitive.indices > -1;
+
             // Vertices
             {
                 const float *bufferPos = nullptr;
                 const float *bufferNormals = nullptr;
-                const float *bufferTexCoords = nullptr;
-                const float* bufferColors = nullptr;
-                const float *bufferTangents = nullptr;
-                uint32_t numColorComponents;
-                const uint16_t *bufferJoints = nullptr;
+                const float *bufferTexCoordSet0 = nullptr;
+                const float *bufferTexCoordSet1 = nullptr;
+                const float *bufferColorSet0 = nullptr;
+                const void  *bufferJoints = nullptr;
                 const float *bufferWeights = nullptr;
+                const float *bufferTangents = nullptr;
+
+                // bs i.e. ByteStride
+                int bsPos;
+                int bsNormal;
+                int bsUV0;
+                int bsUV1;
+                int bsColor0;
+                int bsJoint;
+                int bsWeight;
+                int bsTangent;
+
+                uint32_t jointComponentType = TINYGLTF_COMPONENT_TYPE_BYTE;
 
                 // Position attribute is required
                 assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
@@ -588,28 +530,41 @@ void LeoRenderer::GLTFModel::LoadNode(
                 bufferPos = reinterpret_cast<const float *>(&(model.buffers[posView.buffer].data[posAccessor.byteOffset + posView.byteOffset]));
                 posMin = glm::vec3(posAccessor.minValues[0], posAccessor.minValues[1], posAccessor.minValues[2]);
                 posMax = glm::vec3(posAccessor.maxValues[0], posAccessor.maxValues[1], posAccessor.maxValues[2]);
+                vertexCount = static_cast<uint32_t>(posAccessor.count);
+                bsPos = posAccessor.ByteStride(posView) ? (int)(posAccessor.ByteStride(posView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC3);
 
                 if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
                 {
-                    const tinygltf::Accessor &normAccessor = model.accessors[primitive.attributes.find("NORMAL")->second];
-                    const tinygltf::BufferView &normView = model.bufferViews[normAccessor.bufferView];
-                    bufferNormals = reinterpret_cast<const float *>(&(model.buffers[normView.buffer].data[normAccessor.byteOffset + normView.byteOffset]));
+                    const tinygltf::Accessor &normalAccessor = model.accessors[primitive.attributes.find("NORMAL")->second];
+                    const tinygltf::BufferView &normalView = model.bufferViews[normalAccessor.bufferView];
+                    bufferNormals = reinterpret_cast<const float *>(&(model.buffers[normalView.buffer].data[normalAccessor.byteOffset + normalView.byteOffset]));
+                    bsNormal = normalAccessor.ByteStride(normalView) ? (int)(normalAccessor.ByteStride(normalView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC3);
                 }
 
+                // UV
                 if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
                 {
                     const tinygltf::Accessor &uvAccessor = model.accessors[primitive.attributes.find("TEXCOORD_0")->second];
                     const tinygltf::BufferView &uvView = model.bufferViews[uvAccessor.bufferView];
-                    bufferTexCoords = reinterpret_cast<const float *>(&(model.buffers[uvView.buffer].data[uvAccessor.byteOffset + uvView.byteOffset]));
+                    bufferTexCoordSet0 = reinterpret_cast<const float *>(&(model.buffers[uvView.buffer].data[uvAccessor.byteOffset + uvView.byteOffset]));
+                    bsUV0 = uvAccessor.ByteStride(uvView) ? (int)(uvAccessor.ByteStride(uvView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC2);
+                }
+                if (primitive.attributes.find("TEXCOORD_1") != primitive.attributes.end())
+                {
+                    const tinygltf::Accessor &uvAccessor = model.accessors[primitive.attributes.find("TEXCOORD_1")->second];
+                    const tinygltf::BufferView &uvView = model.bufferViews[uvAccessor.bufferView];
+                    bufferTexCoordSet1 = reinterpret_cast<const float *>(&(model.buffers[uvView.buffer].data[uvAccessor.byteOffset + uvView.byteOffset]));
+                    bsUV1 = uvAccessor.ByteStride(uvView) ? (int)(uvAccessor.ByteStride(uvView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC2);
                 }
 
+                // Vertex Color
                 if (primitive.attributes.find("COLOR_0") != primitive.attributes.end())
                 {
                     const tinygltf::Accessor& colorAccessor = model.accessors[primitive.attributes.find("COLOR_0")->second];
                     const tinygltf::BufferView& colorView = model.bufferViews[colorAccessor.bufferView];
                     // Color buffer are either of type vec3 or vec4
-                    numColorComponents = colorAccessor.type == TINYGLTF_PARAMETER_TYPE_FLOAT_VEC3 ? 3 : 4;
-                    bufferColors = reinterpret_cast<const float*>(&(model.buffers[colorView.buffer].data[colorAccessor.byteOffset + colorView.byteOffset]));
+                    bufferColorSet0 = reinterpret_cast<const float*>(&(model.buffers[colorView.buffer].data[colorAccessor.byteOffset + colorView.byteOffset]));
+                    bsColor0 = colorAccessor.ByteStride(colorView) ? (int)(colorAccessor.ByteStride(colorView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC3);
                 }
 
                 if (primitive.attributes.find("TANGENT") != primitive.attributes.end())
@@ -617,6 +572,7 @@ void LeoRenderer::GLTFModel::LoadNode(
                     const tinygltf::Accessor &tangentAccessor = model.accessors[primitive.attributes.find("TANGENT")->second];
                     const tinygltf::BufferView &tangentView = model.bufferViews[tangentAccessor.bufferView];
                     bufferTangents = reinterpret_cast<const float *>(&(model.buffers[tangentView.buffer].data[tangentAccessor.byteOffset + tangentView.byteOffset]));
+                    bsTangent = tangentAccessor.ByteStride(tangentView) ? (int)(tangentAccessor.ByteStride(tangentView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC3);
                 }
 
                 // Skinning
@@ -626,84 +582,103 @@ void LeoRenderer::GLTFModel::LoadNode(
                     const tinygltf::Accessor &jointAccessor = model.accessors[primitive.attributes.find("JOINTS_0")->second];
                     const tinygltf::BufferView &jointView = model.bufferViews[jointAccessor.bufferView];
                     bufferJoints = reinterpret_cast<const uint16_t *>(&(model.buffers[jointView.buffer].data[jointAccessor.byteOffset + jointView.byteOffset]));
+                    bsJoint = jointAccessor.ByteStride(jointView) ? (jointAccessor.ByteStride(jointView) / tinygltf::GetComponentSizeInBytes(jointComponentType)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC4);
                 }
 
                 if (primitive.attributes.find("WEIGHTS_0") != primitive.attributes.end())
                 {
-                    const tinygltf::Accessor &uvAccessor = model.accessors[primitive.attributes.find("WEIGHTS_0")->second];
-                    const tinygltf::BufferView &uvView = model.bufferViews[uvAccessor.bufferView];
-                    bufferWeights = reinterpret_cast<const float *>(&(model.buffers[uvView.buffer].data[uvAccessor.byteOffset + uvView.byteOffset]));
+                    const tinygltf::Accessor &weightAccessor = model.accessors[primitive.attributes.find("WEIGHTS_0")->second];
+                    const tinygltf::BufferView &weightView = model.bufferViews[weightAccessor.bufferView];
+                    bufferWeights = reinterpret_cast<const float *>(&(model.buffers[weightView.buffer].data[weightAccessor.byteOffset + weightView.byteOffset]));
+                    bsWeight = weightAccessor.ByteStride(weightView) ? (int)(weightAccessor.ByteStride(weightView) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC4);
                 }
 
                 hasSkin = (bufferJoints && bufferWeights);
 
-                vertexCount = static_cast<uint32_t>(posAccessor.count);
-
                 for (size_t v = 0; v < posAccessor.count; v++)
                 {
-                    Vertex vert{};
-                    vert.mPos = glm::vec4(glm::make_vec3(&bufferPos[v * 3]), 1.0f);
-                    vert.mNormal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * 3]) : glm::vec3(0.0f)));
-                    vert.mUV = bufferTexCoords ? glm::make_vec2(&bufferTexCoords[v * 2]) : glm::vec3(0.0f);
-                    if (bufferColors)
+                    Vertex& vert = loaderInfo.mVertexBuffer[loaderInfo.mVertexPos];
+                    vert.mPos = glm::vec4(glm::make_vec3(&bufferPos[v * bsPos]), 1.0f);
+                    vert.mNormal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * bsNormal]) : glm::vec3(0.0f)));
+                    vert.mUV0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * bsUV0]) : glm::vec3(0.0f);
+                    vert.mUV1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * bsUV1]) : glm::vec3(0.0f);
+                    vert.mColor = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * bsColor0]) : glm::vec4(1.0f);
+
+                    if (hasSkin)
                     {
-                        switch (numColorComponents)
+                        switch (jointComponentType)
                         {
-                            case 3:
-                                vert.mColor = glm::vec4(glm::make_vec3(&bufferColors[v * 3]), 1.0f);
-                            case 4:
-                                vert.mColor = glm::make_vec4(&bufferColors[v * 4]);
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                            {
+                                auto *buf = static_cast<const uint16_t*>(bufferJoints);
+                                vert.mJoint0 = glm::vec4(glm::make_vec4(&buf[v * bsJoint]));
+                                break;
+                            }
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                            {
+                                auto *buf = static_cast<const uint8_t*>(bufferJoints);
+                                vert.mJoint0 = glm::vec4(glm::make_vec4(&buf[v * bsJoint]));
+                                break;
+                            }
+                            default:
+                                // Not supported by spec
+                                std::cerr << "Joint component type " << jointComponentType << " not supported!" << std::endl;
+                                break;
                         }
                     }
-                    else {
-                        vert.mColor = glm::vec4(1.0f);
+                    else
+                    {
+                        vert.mJoint0 = glm::vec4(0.0f);
                     }
-                    vert.mTangent = bufferTangents ? glm::vec4(glm::make_vec4(&bufferTangents[v * 4])) : glm::vec4(0.0f);
-                    vert.mJoint0 = hasSkin ? glm::vec4(glm::make_vec4(&bufferJoints[v * 4])) : glm::vec4(0.0f);
-                    vert.mWeight0 = hasSkin ? glm::make_vec4(&bufferWeights[v * 4]) : glm::vec4(0.0f);
-                    vertexBuffer.push_back(vert);
+                    vert.mTangent = bufferTangents ? glm::vec4(glm::make_vec4(&bufferTangents[v * bsTangent])) : glm::vec4(0.0f);
+                    if (glm::length(vert.mWeight0) == 0.0f)
+                    {
+                        vert.mWeight0 = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+                    }
+
+                    loaderInfo.mVertexPos++;
                 }
             }
             // Indices
+            if (hasIndices)
             {
                 const tinygltf::Accessor &accessor = model.accessors[primitive.indices];
                 const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
                 const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
 
                 indexCount = static_cast<uint32_t>(accessor.count);
+                const void* dataPtr = &(buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 
-                switch (accessor.componentType) {
+                switch (accessor.componentType)
+                {
                     case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
                     {
-                        auto buf = new uint32_t[accessor.count];
-                        memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint32_t));
+                        auto buf = static_cast<const uint32_t*>(dataPtr);
                         for (size_t index = 0; index < accessor.count; index++)
                         {
-                            indexBuffer.push_back(buf[index] + vertexStart);
+                            loaderInfo.mIndexBuffer[loaderInfo.mIndexPos] = buf[index] + vertexStart;
+                            loaderInfo.mIndexPos++;
                         }
-                        delete[] buf;
                         break;
                     }
                     case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
                     {
-                        auto buf = new uint16_t[accessor.count];
-                        memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint16_t));
+                        auto buf = static_cast<const uint16_t*>(dataPtr);
                         for (size_t index = 0; index < accessor.count; index++)
                         {
-                            indexBuffer.push_back(buf[index] + vertexStart);
+                            loaderInfo.mIndexBuffer[loaderInfo.mIndexPos] = buf[index] + vertexStart;
+                            loaderInfo.mIndexPos++;
                         }
-                        delete[] buf;
                         break;
                     }
                     case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE:
                     {
-                        auto buf = new uint8_t[accessor.count];
-                        memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint8_t));
+                        auto buf = static_cast<const uint8_t*>(dataPtr);
                         for (size_t index = 0; index < accessor.count; index++)
                         {
-                            indexBuffer.push_back(buf[index] + vertexStart);
+                            loaderInfo.mIndexBuffer[loaderInfo.mIndexPos] = buf[index] + vertexStart;
+                            loaderInfo.mIndexPos++;
                         }
-                        delete[] buf;
                         break;
                     }
                     default:
@@ -711,11 +686,19 @@ void LeoRenderer::GLTFModel::LoadNode(
                         return;
                 }
             }
-            auto newPrimitive = new Primitive(indexStart, indexCount, primitive.material > -1 ? mMaterials[primitive.material] : mMaterials.back());
-            newPrimitive->mFirstVertex = vertexStart;
-            newPrimitive->mVertexCount = vertexCount;
-            newPrimitive->SetDimensions(posMin, posMax);
+            auto newPrimitive = new Primitive(indexStart, indexCount, vertexCount, primitive.material > -1 ? mMaterials[primitive.material] : mMaterials.back());
+            newPrimitive->SetBoundingBox(posMin, posMax);
             newMesh->mPrimitives.push_back(newPrimitive);
+        }
+        for (auto p : newMesh->mPrimitives)
+        {
+            if (p->mBBox.mbValid && !newMesh->mBBox.mbValid)
+            {
+                newMesh->mBBox = p->mBBox;
+                newMesh->mBBox.mbValid = true;
+            }
+            newMesh->mBBox.mMin = glm::min(newMesh->mBBox.mMin, p->mBBox.mMin);
+            newMesh->mBBox.mMax = glm::max(newMesh->mBBox.mMax, p->mBBox.mMax);
         }
         newNode->mMesh = newMesh;
     }
@@ -728,6 +711,29 @@ void LeoRenderer::GLTFModel::LoadNode(
         mNodes.push_back(newNode);
     }
     mLinearNodes.push_back(newNode);
+}
+
+void LeoRenderer::GLTFModel::GetNodeProperty(
+    const tinygltf::Node& node,
+    const tinygltf::Model& model,
+    size_t& vertexCount, size_t& indexCount)
+{
+    if (!node.children.empty())
+    {
+        for (auto & child : node.children)
+        {
+            GetNodeProperty(model.nodes[child], model, vertexCount, indexCount);
+        }
+    }
+    if (node.mesh > -1)
+    {
+        const tinygltf::Mesh mesh = model.meshes[node.mesh];
+        for (auto primitive : mesh.primitives)
+        {
+            vertexCount += model.accessors[primitive.attributes.find("POSITION")->second].count;
+            if (primitive.indices > -1) indexCount += model.accessors[primitive.indices].count;
+        }
+    }
 }
 
 void LeoRenderer::GLTFModel::LoadSkins(tinygltf::Model &gltfModel)
@@ -763,31 +769,104 @@ void LeoRenderer::GLTFModel::LoadSkins(tinygltf::Model &gltfModel)
     }
 }
 
-void LeoRenderer::GLTFModel::LoadImages(tinygltf::Model &gltfModel, vks::VulkanDevice *device, VkQueue transferQueue)
+void LeoRenderer::GLTFModel::LoadTextures(
+    tinygltf::Model &gltfModel,
+    vks::VulkanDevice *device,
+    VkQueue transferQueue)
 {
-    for (tinygltf::Image& image : gltfModel.images)
+    for (auto & tex : gltfModel.textures)
     {
-        LeoRenderer::Texture tex;
-        tex.FromGLTFImage(image, mPath, device, transferQueue);
-        mTextures.push_back(tex);
+        tinygltf::Image image = gltfModel.images[tex.source];
+        LeoRenderer::TextureSampler texSampler{};
+        if (tex.sampler == -1)
+        {
+            // No sampler specified, use a default one
+            texSampler.mMagFilter = VK_FILTER_LINEAR;
+            texSampler.mMinFilter = VK_FILTER_LINEAR;
+            texSampler.mAddressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            texSampler.mAddressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            texSampler.mAddressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        }
+        else
+        {
+            texSampler = mTexSamplers[tex.sampler];
+        }
+        LeoRenderer::Texture texture;
+        texture.FromGLTFImage(image, texSampler, device, transferQueue);
+        mTextures.push_back(texture);
     }
-    CreateEmptyTexture(transferQueue);
 }
+
+VkSamplerAddressMode LeoRenderer::GLTFModel::GetVkWrapMode(int32_t wrapMode)
+{
+    switch (wrapMode)
+    {
+        case -1:
+        case 10497:
+            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        case 33071:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case 33648:
+            return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        default:
+            std::cerr << "Unknown wrap mode: " << wrapMode << std::endl;
+            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+}
+
+VkFilter LeoRenderer::GLTFModel::GetVkFilterMode(int32_t filterMode)
+{
+    switch (filterMode)
+    {
+        case -1:
+        case 9728:
+            return VK_FILTER_NEAREST;
+        case 9729:
+            return VK_FILTER_LINEAR;
+        case 9984:
+        case 9985:
+            return VK_FILTER_NEAREST;
+        case 9986:
+        case 9987:
+            return VK_FILTER_LINEAR;
+        default:
+            std::cerr << "Unknown filter mode: " << filterMode << std::endl;
+            return VK_FILTER_NEAREST;
+    }
+}
+
+void LeoRenderer::GLTFModel::LoadTextureSamplers(tinygltf::Model &gltfModel)
+{
+    for (const tinygltf::Sampler& smpl : gltfModel.samplers)
+    {
+        LeoRenderer::TextureSampler sampler{};
+        sampler.mMinFilter = GetVkFilterMode(smpl.minFilter);
+        sampler.mMagFilter = GetVkFilterMode(smpl.magFilter);
+        sampler.mAddressModeU = GetVkWrapMode(smpl.wrapS);
+        sampler.mAddressModeV = GetVkWrapMode(smpl.wrapT);
+        sampler.mAddressModeW = sampler.mAddressModeV;
+        mTexSamplers.push_back(sampler);
+    }
+}
+
 
 void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
 {
     for (tinygltf::Material &mat : gltfModel.materials)
     {
         LeoRenderer::Material material{};
+        material.m_bDoubleSided = mat.doubleSided;
 
         if (mat.values.find("baseColorTexture") != mat.values.end())
         {
-            material.mBaseColorTexture = GetTexture(gltfModel.textures[mat.values["baseColorTexture"].TextureIndex()].source);
+            material.mBaseColorTexture = &mTextures[mat.values["baseColorTexture"].TextureIndex()];
+            material.mTexCoordSet.mBaseColor = mat.values["baseColorTexture"].TextureTexCoord();
         }
         // Metallic roughness workflow
         if (mat.values.find("metallicRoughnessTexture") != mat.values.end())
         {
-            material.mMetallicRoughnessTexture = GetTexture(gltfModel.textures[mat.values["metallicRoughnessTexture"].TextureIndex()].source);
+            material.mMetallicRoughnessTexture = &mTextures[mat.values["metallicRoughnessTexture"].TextureIndex()];
+            material.mTexCoordSet.mMetallicRoughness = mat.values["metallicRoughnessTexture"].TextureTexCoord();
         }
         if (mat.values.find("roughnessFactor") != mat.values.end())
         {
@@ -803,15 +882,13 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         }
         if (mat.additionalValues.find("normalTexture") != mat.additionalValues.end())
         {
-            material.mNormalTexture = GetTexture(gltfModel.textures[mat.additionalValues["normalTexture"].TextureIndex()].source);
-        }
-        else
-        {
-            material.mNormalTexture = &mEmptyTexture;
+            material.mNormalTexture = &mTextures[mat.additionalValues["normalTexture"].TextureIndex()];
+            material.mTexCoordSet.mNormal = mat.additionalValues["normalTexture"].TextureTexCoord();
         }
         if (mat.additionalValues.find("emissiveTexture") != mat.additionalValues.end())
         {
-            material.mEmissiveTexture = GetTexture(gltfModel.textures[mat.additionalValues["emissiveTexture"].TextureIndex()].source);
+            material.mEmissiveTexture = &mTextures[mat.additionalValues["emissiveTexture"].TextureIndex()];
+            material.mTexCoordSet.mEmissive = mat.additionalValues["emissiveTexture"].TextureTexCoord();
         }
         if (mat.additionalValues.find("emissiveFactor") != mat.additionalValues.end())
         {
@@ -819,30 +896,74 @@ void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
         }
         if (mat.additionalValues.find("occlusionTexture") != mat.additionalValues.end())
         {
-            material.mOcclusionTexture = GetTexture(gltfModel.textures[mat.additionalValues["occlusionTexture"].TextureIndex()].source);
+            material.mOcclusionTexture = &mTextures[mat.additionalValues["occlusionTexture"].TextureIndex()];
+            material.mTexCoordSet.mOcclusion = mat.additionalValues["occlusionTexture"].TextureTexCoord();
         }
         if (mat.additionalValues.find("alphaMode") != mat.additionalValues.end())
         {
             tinygltf::Parameter param = mat.additionalValues["alphaMode"];
-
-            if (param.string_value == "BLEND") material.mAlphaMode = Material::ALPHA_MODE_BLEND;
-            if (param.string_value == "MASK") material.mAlphaMode = Material::ALPHA_MODE_MASK;
+            if (param.string_value == "BLEND")
+            {
+                material.mAlphaMode = Material::ALPHA_MODE_BLEND;
+            }
+            if (param.string_value == "MASK")
+            {
+                material.mAlphaCutoff = 0.5f;
+                material.mAlphaMode = Material::ALPHA_MODE_MASK;
+            }
 
         }
         if (mat.additionalValues.find("alphaCutoff") != mat.additionalValues.end())
         {
             material.mAlphaCutoff = static_cast<float>(mat.additionalValues["alphaCutoff"].Factor());
         }
-        material.m_bDoubleSided = mat.doubleSided;
+
+        // Extensions
+        if (mat.extensions.find("KHR_materials_pbrSpecularGlossiness") != mat.extensions.end())
+        {
+            auto ext = mat.extensions.find("KHR_materials_pbrSpecularGlossiness");
+            if (ext->second.Has("specularGlossinessTexture"))
+            {
+                auto index = ext->second.Get("specularGlossinessTexture").Get("index");
+                material.mExtension.mSpecularGlossinessTexture = &mTextures[index.Get<int>()];
+                auto texCoordSet = ext->second.Get("specularGlossinessTexture").Get("texCoord");
+                material.mTexCoordSet.mSpecularGlossiness = texCoordSet.Get<int>();
+                material.mPBRWorkFlows.mbSpecularGlossiness = true;
+            }
+            if (ext->second.Has("diffuseTexture"))
+            {
+                auto index = ext->second.Get("diffuseTexture").Get("index");
+                material.mExtension.mDiffuseTexture = &mTextures[index.Get<int>()];
+            }
+            if (ext->second.Has("diffuseFactor"))
+            {
+                auto factor = ext->second.Get("diffuseFactor");
+                for (int i = 0; i < factor.ArrayLen(); i++)
+                {
+                    auto val = factor.Get(i);
+                    material.mExtension.mDiffuseFactor[i] = val.IsNumber() ? (float)val.Get<double>() : (float)val.Get<int>();
+                }
+            }
+            if (ext->second.Has("specularFactor"))
+            {
+                auto factor = ext->second.Get("specularFactor");
+                for (int i = 0; i < factor.ArrayLen(); i++)
+                {
+                    auto val = factor.Get(i);
+                    material.mExtension.mSpecularFactor[i] = val.IsNumber() ? (float)val.Get<double>() : (float)val.Get<int>();
+                }
+            }
+        }
         mMaterials.push_back(material);
     }
     // Push a default material at the end of the list for meshes with no material assigned
-    // mMaterials.emplace_back(m_pDevice);
+    mMaterials.emplace_back();
 }
 
 void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
 {
-    for (tinygltf::Animation &anim : gltfModel.animations) {
+    for (tinygltf::Animation &anim : gltfModel.animations)
+    {
         LeoRenderer::Animation animation{};
         animation.mName = anim.name;
         if (anim.name.empty())
@@ -867,13 +988,12 @@ void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
 
                 assert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 
-                auto buf = new float[accessor.count];
-                memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(float));
+                const void* dataPtr = &buffer.data[accessor.byteOffset + bufferView.byteOffset];
+                auto buf = static_cast<const float*>(dataPtr);
                 for (size_t index = 0; index < accessor.count; index++)
                 {
                     sampler.mInputs.push_back(buf[index]);
                 }
-                delete[] buf;
 
                 for (auto input : sampler.mInputs)
                 {
@@ -896,28 +1016,26 @@ void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
 
                 assert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 
+                const void* dataPtr = &buffer.data[accessor.byteOffset + bufferView.byteOffset];
+
                 switch (accessor.type)
                 {
                     case TINYGLTF_TYPE_VEC3:
                     {
-                        auto buf = new glm::vec3[accessor.count];
-                        memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(glm::vec3));
+                        auto buf = static_cast<const glm::vec3*>(dataPtr);
                         for (size_t index = 0; index < accessor.count; index++)
                         {
                             sampler.mOutputsVec4.emplace_back(buf[index], 0.0f);
                         }
-                        delete[] buf;
                         break;
                     }
                     case TINYGLTF_TYPE_VEC4:
                     {
-                        auto buf = new glm::vec4[accessor.count];
-                        memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(glm::vec4));
+                        auto buf = static_cast<const glm::vec4*>(dataPtr);
                         for (size_t index = 0; index < accessor.count; index++)
                         {
                             sampler.mOutputsVec4.emplace_back(buf[index]);
                         }
-                        delete[] buf;
                         break;
                     }
                     default:
@@ -959,7 +1077,6 @@ void LeoRenderer::GLTFModel::LoadAnimations(tinygltf::Model &gltfModel)
 
             animation.mChannels.push_back(channel);
         }
-
         mAnimations.push_back(animation);
     }
 }
@@ -968,38 +1085,48 @@ void LeoRenderer::GLTFModel::LoadFromFile(
     std::string& filename,
     vks::VulkanDevice *device,
     VkQueue transferQueue,
-    uint32_t fileLoadingFlags, float scale)
+    float scale)
 {
     tinygltf::Model gltfModel;
     tinygltf::TinyGLTF gltfContext;
-    if (fileLoadingFlags & FileLoadingFlags::DontLoadImages)
-        gltfContext.SetImageLoader(loadImageDataFuncEmpty, nullptr);
-    else
-        gltfContext.SetImageLoader(loadImageDataFunc, nullptr);
 
-    size_t pos = filename.find_last_of('/');
-    mPath = filename.substr(0, pos);
-
-    std::string error, warning;
+    std::string error;
+    std::string warning;
 
     m_pDevice = device;
 
-    bool fileLoaded = gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, filename);
+    bool binary = false;
+    size_t extPos = filename.rfind('.', filename.length());
+    if (extPos != std::string::npos)
+    {
+        binary = (filename.substr(extPos + 1, filename.length() - extPos) == "glb");
+    }
 
-    std::vector<uint32_t> indexBuffer;
-    std::vector<Vertex> vertexBuffer;
+    bool fileLoaded = binary ?
+        gltfContext.LoadBinaryFromFile(&gltfModel, &error, &warning, filename) :
+        gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, filename);
+
+    LoaderInfo loaderInfo{};
+    size_t vertexCount = 0;
+    size_t indexCount = 0;
 
     if (fileLoaded)
     {
-        if (!(fileLoadingFlags & FileLoadingFlags::DontLoadImages))
-            LoadImages(gltfModel, device, transferQueue);
+        LoadTextureSamplers(gltfModel);
+        LoadTextures(gltfModel, m_pDevice, transferQueue);
         LoadMaterials(gltfModel);
 
         const tinygltf::Scene &scene = gltfModel.scenes[gltfModel.defaultScene > -1 ? gltfModel.defaultScene : 0];
         for (auto i : scene.nodes)
         {
+            GetNodeProperty(gltfModel.nodes[i], gltfModel, vertexCount, indexCount);
+        }
+        loaderInfo.mVertexBuffer = new Vertex[vertexCount];
+        loaderInfo.mIndexBuffer = new uint32_t[indexCount];
+        for (auto i : scene.nodes)
+        {
             const tinygltf::Node node = gltfModel.nodes[i];
-            LoadNode(nullptr, node, i, gltfModel, indexBuffer, vertexBuffer, scale);
+            LoadNode(nullptr, node, i, gltfModel, loaderInfo, scale);
         }
         if (!gltfModel.animations.empty())
         {
@@ -1028,61 +1155,10 @@ void LeoRenderer::GLTFModel::LoadFromFile(
         return;
     }
 
-    // Pre-Calculations for requested features
-    if ((fileLoadingFlags & FileLoadingFlags::PreTransformVertices) ||
-        (fileLoadingFlags & FileLoadingFlags::PreMultiplyVertexColors) ||
-        (fileLoadingFlags & FileLoadingFlags::FlipY))
-    {
-        const bool preTransform = fileLoadingFlags & FileLoadingFlags::PreTransformVertices;
-        const bool preMultiplyColor = fileLoadingFlags & FileLoadingFlags::PreMultiplyVertexColors;
-        const bool flipY = fileLoadingFlags & FileLoadingFlags::FlipY;
+    mExtensions = gltfModel.extensionsUsed;
 
-        for (Node* node : mLinearNodes)
-        {
-            if (node->mMesh)
-            {
-                const glm::mat4 localMatrix = node->GetMatrix();
-                for (Primitive* primitive : node->mMesh->mPrimitives)
-                {
-                    for (uint32_t i = 0; i < primitive->mVertexCount; i++)
-                    {
-                        Vertex& vertex = vertexBuffer[primitive->mFirstVertex + i];
-                        // Pre-transform vertex positions by node-hierarchy
-                        if (preTransform)
-                        {
-                            vertex.mPos = glm::vec3(localMatrix * glm::vec4(vertex.mPos, 1.0f));
-                            vertex.mNormal = glm::normalize(glm::mat3(localMatrix) * vertex.mNormal);
-                        }
-                        // Flip Y-Axis of vertex positions
-                        if (flipY)
-                        {
-                            vertex.mPos.y *= -1.0f;
-                            vertex.mNormal.y *= -1.0f;
-                        }
-                        // Pre-Multiply vertex colors with material base color
-                        if (preMultiplyColor)
-                        {
-                            vertex.mColor = primitive->mMaterial.mBaseColorFactor * vertex.mColor;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    for (auto& extension : gltfModel.extensionsUsed)
-    {
-        if (extension == "KHR_materials_pbrSpecularGlossiness")
-        {
-            std::cout << "Required extension: " << extension;
-            m_bMetallicWorkFlow = false;
-        }
-    }
-
-    size_t vertexBufferSize = vertexBuffer.size() * sizeof(Vertex);
-    size_t indexBufferSize = indexBuffer.size() * sizeof(uint32_t);
-    mIndices.count = static_cast<uint32_t>(indexBuffer.size());
-    mVertices.count = static_cast<uint32_t>(vertexBuffer.size());
+    size_t vertexBufferSize = vertexCount * sizeof(Vertex);
+    size_t indexBufferSize = indexCount * sizeof(uint32_t);
 
     assert((vertexBufferSize > 0) && (indexBufferSize > 0));
 
@@ -1100,7 +1176,7 @@ void LeoRenderer::GLTFModel::LoadFromFile(
         vertexBufferSize,
         &vertexStaging.buffer,
         &vertexStaging.memory,
-        vertexBuffer.data()))
+        loaderInfo.mVertexBuffer))
 
     // Index data
     VK_CHECK_RESULT(device->createBuffer(
@@ -1109,34 +1185,34 @@ void LeoRenderer::GLTFModel::LoadFromFile(
         indexBufferSize,
         &indexStaging.buffer,
         &indexStaging.memory,
-        indexBuffer.data()));
+        loaderInfo.mIndexBuffer));
 
     // Create device local buffers
     // Vertex buffer
     VK_CHECK_RESULT(device->createBuffer(
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | memoryPropertyFlags,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         vertexBufferSize,
-        &mVertices.buffer,
-        &mVertices.memory));
+        &mVertices.mVBuffer,
+        &mVertices.mVMemory));
     // Index buffer
     VK_CHECK_RESULT(device->createBuffer(
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | memoryPropertyFlags,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         indexBufferSize,
-        &mIndices.buffer,
-        &mIndices.memory));
+        &mIndices.mIBuffer,
+        &mIndices.mIMemory));
 
     // Copy from staging buffers
     VkCommandBuffer copyCmd = device->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
-    VkBufferCopy copyRegion = {};
+    VkBufferCopy copyRegion{};
 
     copyRegion.size = vertexBufferSize;
-    vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, mVertices.buffer, 1, &copyRegion);
+    vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, mVertices.mVBuffer, 1, &copyRegion);
 
     copyRegion.size = indexBufferSize;
-    vkCmdCopyBuffer(copyCmd, indexStaging.buffer, mIndices.buffer, 1, &copyRegion);
+    vkCmdCopyBuffer(copyCmd, indexStaging.buffer, mIndices.mIBuffer, 1, &copyRegion);
 
     device->flushCommandBuffer(copyCmd, transferQueue, true);
 
@@ -1145,176 +1221,94 @@ void LeoRenderer::GLTFModel::LoadFromFile(
     vkDestroyBuffer(device->logicalDevice, indexStaging.buffer, nullptr);
     vkFreeMemory(device->logicalDevice, indexStaging.memory, nullptr);
 
+    delete[] loaderInfo.mVertexBuffer;
+    delete[] loaderInfo.mIndexBuffer;
+
     GetSceneDimensions();
-
-    // Setup descriptors
-    uint32_t uboCount{ 0 };
-    uint32_t imageCount{ 0 };
-    for (auto node : mLinearNodes)
-    {
-        if (node->mMesh) uboCount++;
-    }
-    for (auto material : mMaterials)
-    {
-        if (material.mBaseColorTexture != nullptr) imageCount++;
-    }
-
-    std::vector<VkDescriptorPoolSize> poolSizes =
-    {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboCount },
-    };
-    if (imageCount > 0)
-    {
-        if (descriptorBindingFlags & DescriptorBindingFlags::ImageBaseColor)
-        {
-            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageCount });
-        }
-        if (descriptorBindingFlags & DescriptorBindingFlags::ImageNormalMap)
-        {
-            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageCount });
-        }
-    }
-    VkDescriptorPoolCreateInfo descriptorPoolCI{};
-    descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    descriptorPoolCI.pPoolSizes = poolSizes.data();
-    descriptorPoolCI.maxSets = uboCount + imageCount;
-    VK_CHECK_RESULT(vkCreateDescriptorPool(device->logicalDevice, &descriptorPoolCI, nullptr, &mDescPool));
-
-    // Descriptors for per-node uniform buffers
-    {
-        // Layout is global, so only create if it hasn't already been created before
-        if (descriptorSetLayoutUBO == VK_NULL_HANDLE)
-        {
-            std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings =
-            {
-                vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-            };
-            VkDescriptorSetLayoutCreateInfo descriptorLayoutCI{};
-            descriptorLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            descriptorLayoutCI.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
-            descriptorLayoutCI.pBindings = setLayoutBindings.data();
-            VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->logicalDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayoutUBO));
-        }
-        for (auto node : mNodes)
-        {
-            PrepareNodeDescriptor(node, descriptorSetLayoutUBO);
-        }
-    }
-
-    // Descriptors for per-material images
-    {
-        // Layout is global, so only create if it hasn't already been created before
-        if (descriptorSetLayoutImage == VK_NULL_HANDLE) {
-            std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
-            if (descriptorBindingFlags & DescriptorBindingFlags::ImageBaseColor) {
-                setLayoutBindings.push_back(vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, static_cast<uint32_t>(setLayoutBindings.size())));
-            }
-            if (descriptorBindingFlags & DescriptorBindingFlags::ImageNormalMap) {
-                setLayoutBindings.push_back(vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, static_cast<uint32_t>(setLayoutBindings.size())));
-            }
-            VkDescriptorSetLayoutCreateInfo descriptorLayoutCI{};
-            descriptorLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            descriptorLayoutCI.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
-            descriptorLayoutCI.pBindings = setLayoutBindings.data();
-            VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->logicalDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayoutImage));
-        }
-        for (auto& material : mMaterials) {
-            if (material.mBaseColorTexture != nullptr) {
-                material.CreateDescSet(mDescPool, LeoRenderer::descriptorSetLayoutImage, descriptorBindingFlags);
-            }
-        }
-    }
 }
 
-void LeoRenderer::GLTFModel::BindBuffers(VkCommandBuffer commandBuffer)
+void LeoRenderer::GLTFModel::DrawNode(LeoRenderer::Node *node, VkCommandBuffer commandBuffer)
 {
+    if (node->mMesh)
+    {
+        for (auto primitive : node->mMesh->mPrimitives)
+        {
+            vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+        }
+    }
+    for (auto& child : node->mChildren) DrawNode(child, commandBuffer);
+}
+
+void LeoRenderer::GLTFModel::Draw(VkCommandBuffer commandBuffer)
+{
+
     const VkDeviceSize offsets[1]{};
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.buffer, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, mIndices.buffer, 0, VK_INDEX_TYPE_UINT32);
-    m_bBufferBound = true;
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.mVBuffer, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, mIndices.mIBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    for (auto& node : mNodes) DrawNode(node, commandBuffer);
 }
 
-void LeoRenderer::GLTFModel::DrawNode(
-    LeoRenderer::Node *node,
-    VkCommandBuffer commandBuffer,
-    uint32_t renderFlags,
-    VkPipelineLayout pipelineLayout,
-    uint32_t bindImageSet)
+void LeoRenderer::GLTFModel::CalculateBoundingBox(LeoRenderer::Node *node, LeoRenderer::Node *parent)
 {
-    if (!node->visible) return;
+    BoundingBox parentBVH = parent ? parent->mBVH : BoundingBox(mDimensions.mMin, mDimensions.mMax);
+
     if (node->mMesh)
     {
-        for (auto primitive : node->mMesh->mPrimitives)
+        if (node->mMesh->mBBox.mbValid)
         {
-            bool skip = false;
-            const LeoRenderer::Material& material = primitive->mMaterial;
-
-            if (renderFlags & RenderFlags::RenderOpaqueNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_OPAQUE);
-            if (renderFlags & RenderFlags::RenderAlphaMaskedNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_MASK);
-            if (renderFlags & RenderFlags::RenderAlphaBlendedNodes) skip = (material.mAlphaMode != Material::ALPHA_MODE_BLEND);
-
-            if (!skip)
+            node->mAABB = node->mMesh->mBBox.GetAABB(node->GetMatrix());
+            if (node->mChildren.empty())
             {
-                if (renderFlags & RenderFlags::BindImages)
-                {
-                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &material.mDescriptorSet, 0, nullptr);
-                }
-                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                node->mBVH.mMin = node->mAABB.mMin;
+                node->mBVH.mMax = node->mAABB.mMax;
+                node->mBVH.mbValid = true;
             }
         }
     }
-    for (auto& child : node->mChildren) DrawNode(child, commandBuffer, renderFlags, pipelineLayout, bindImageSet);
-}
+    parentBVH.mMin = glm::min(parentBVH.mMin, node->mBVH.mMin);
+    parentBVH.mMax = glm::max(parentBVH.mMax, node->mBVH.mMax);
 
-void LeoRenderer::GLTFModel::Draw(
-    VkCommandBuffer commandBuffer,
-    uint32_t renderFlags,
-    VkPipelineLayout pipelineLayout,
-    uint32_t bindImageSet)
-{
-    if (!m_bBufferBound)
-    {
-        const VkDeviceSize offsets[1]{};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.buffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, mIndices.buffer, 0, VK_INDEX_TYPE_UINT32);
-    }
-    for (auto& node : mNodes) DrawNode(node, commandBuffer, renderFlags, pipelineLayout, bindImageSet);
-}
-
-void LeoRenderer::GLTFModel::GetNodeDimensions(LeoRenderer::Node *node, glm::vec3 &min, glm::vec3 &max)
-{
-    if (node->mMesh)
-    {
-        for (auto primitive : node->mMesh->mPrimitives)
-        {
-            glm::vec4 locMin = glm::vec4(primitive->mDimensions.min, 1.0f) * node->GetMatrix();
-            glm::vec4 locMax = glm::vec4(primitive->mDimensions.max, 1.0f) * node->GetMatrix();
-            if (locMin.x < min.x) { min.x = locMin.x; }
-            if (locMin.y < min.y) { min.y = locMin.y; }
-            if (locMin.z < min.z) { min.z = locMin.z; }
-            if (locMax.x > max.x) { max.x = locMax.x; }
-            if (locMax.y > max.y) { max.y = locMax.y; }
-            if (locMax.z > max.z) { max.z = locMax.z; }
-        }
-    }
-    for (auto child : node->mChildren) GetNodeDimensions(child, min, max);
+    for (auto & child : node->mChildren) CalculateBoundingBox(child, node);
 }
 
 void LeoRenderer::GLTFModel::GetSceneDimensions()
 {
-    mDimensions.min = glm::vec3(FLT_MAX);
-    mDimensions.max = glm::vec3(-FLT_MAX);
-    for (auto node : mNodes)
-        GetNodeDimensions(node, mDimensions.min, mDimensions.max);
+    for (auto node : mLinearNodes)
+    {
+        CalculateBoundingBox(node, nullptr);
+    }
+    mDimensions.mMin = glm::vec3(FLT_MAX);
+    mDimensions.mMax = glm::vec3(-FLT_MAX);
 
-    mDimensions.size = mDimensions.max - mDimensions.min;
-    mDimensions.center = (mDimensions.min + mDimensions.max) / 2.0f;
-    mDimensions.radius = glm::distance(mDimensions.min, mDimensions.max) / 2.0f;
+    for (auto node : mLinearNodes)
+    {
+        if (node->mBVH.mbValid)
+        {
+            mDimensions.mMin = glm::min(mDimensions.mMin, node->mBVH.mMin);
+            mDimensions.mMax = glm::max(mDimensions.mMax, node->mBVH.mMax);
+        }
+    }
+
+    // Scene AABB
+    mAABB = glm::scale(
+        glm::mat4(1.0f),
+        glm::vec3(
+            mDimensions.mMax[0] - mDimensions.mMin[0],
+            mDimensions.mMax[1] - mDimensions.mMin[1],
+            mDimensions.mMax[2] - mDimensions.mMin[2]));
+    mAABB[3][0] = mDimensions.mMin[0];
+    mAABB[3][1] = mDimensions.mMin[1];
+    mAABB[3][2] = mDimensions.mMin[2];
 }
 
 void LeoRenderer::GLTFModel::UpdateAnimation(uint32_t index, float time)
 {
+    if (mAnimations.empty())
+    {
+        std::cout << ".glTF does not contain animation." << std::endl;
+        return;
+    }
     if (index > static_cast<uint32_t>(mAnimations.size()) - 1)
     {
         std::cout << "No animation with index " << index << std::endl;
@@ -1400,145 +1394,3 @@ LeoRenderer::Node *LeoRenderer::GLTFModel::NodeFromIndex(uint32_t index)
     }
     return nodeFound;
 }
-
-void LeoRenderer::GLTFModel::PrepareNodeDescriptor(
-    LeoRenderer::Node *node, VkDescriptorSetLayout descriptorSetLayout)
-{
-    if (node->mMesh)
-    {
-        VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
-        descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        descriptorSetAllocInfo.descriptorPool = mDescPool;
-        descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
-        descriptorSetAllocInfo.descriptorSetCount = 1;
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_pDevice->logicalDevice, &descriptorSetAllocInfo, &node->mMesh->mUniformBuffer.descriptorSet));
-
-        VkWriteDescriptorSet writeDescriptorSet{};
-        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        writeDescriptorSet.descriptorCount = 1;
-        writeDescriptorSet.dstSet = node->mMesh->mUniformBuffer.descriptorSet;
-        writeDescriptorSet.dstBinding = 0;
-        writeDescriptorSet.pBufferInfo = &node->mMesh->mUniformBuffer.descriptor;
-
-        vkUpdateDescriptorSets(m_pDevice->logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
-    }
-    for (auto& child : node->mChildren)
-    {
-        PrepareNodeDescriptor(child, descriptorSetLayout);
-    }
-}
-
-LeoRenderer::Texture *LeoRenderer::GLTFModel::GetTexture(uint32_t index)
-{
-    if (index < mTextures.size())
-    {
-        return &mTextures[index];
-    }
-    return nullptr;
-}
-
-void LeoRenderer::GLTFModel::CreateEmptyTexture(VkQueue transferQueue)
-{
-    mEmptyTexture.mDevice = m_pDevice;
-    mEmptyTexture.mWidth = 1;
-    mEmptyTexture.mHeight = 1;
-    mEmptyTexture.mLayerCount = 1;
-    mEmptyTexture.mMipLevels = 1;;
-
-    size_t bufferSize = mEmptyTexture.mWidth * mEmptyTexture.mHeight * 4;
-    auto buffer = new unsigned char[bufferSize];
-    memset(buffer, 0, bufferSize);
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo();
-    bufferCreateInfo.size = bufferSize;
-    // This buffer is used as a transfer source for the buffer copy
-    bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VK_CHECK_RESULT(vkCreateBuffer(m_pDevice->logicalDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
-
-    VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
-    VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(m_pDevice->logicalDevice, stagingBuffer, &memReqs);
-    memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = m_pDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VK_CHECK_RESULT(vkAllocateMemory(m_pDevice->logicalDevice, &memAllocInfo, nullptr, &stagingMemory));
-    VK_CHECK_RESULT(vkBindBufferMemory(m_pDevice->logicalDevice, stagingBuffer, stagingMemory, 0));
-
-    // Copy texture data into staging buffer
-    uint8_t* data;
-    VK_CHECK_RESULT(vkMapMemory(m_pDevice->logicalDevice, stagingMemory, 0, memReqs.size, 0, (void**)&data));
-    memcpy(data, buffer, bufferSize);
-    vkUnmapMemory(m_pDevice->logicalDevice, stagingMemory);
-
-    VkBufferImageCopy bufferCopyRegion = {};
-    bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    bufferCopyRegion.imageSubresource.layerCount = 1;
-    bufferCopyRegion.imageExtent.width = mEmptyTexture.mWidth;
-    bufferCopyRegion.imageExtent.height = mEmptyTexture.mHeight;
-    bufferCopyRegion.imageExtent.depth = 1;
-
-    // Create optimal tiled target image
-    VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    imageCreateInfo.mipLevels = 1;
-    imageCreateInfo.arrayLayers = 1;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.extent = { mEmptyTexture.mWidth, mEmptyTexture.mHeight, 1 };
-    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    VK_CHECK_RESULT(vkCreateImage(m_pDevice->logicalDevice, &imageCreateInfo, nullptr, &mEmptyTexture.mImage));
-
-    vkGetImageMemoryRequirements(m_pDevice->logicalDevice, mEmptyTexture.mImage, &memReqs);
-    memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = m_pDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VK_CHECK_RESULT(vkAllocateMemory(m_pDevice->logicalDevice, &memAllocInfo, nullptr, &mEmptyTexture.mDeviceMemory));
-    VK_CHECK_RESULT(vkBindImageMemory(m_pDevice->logicalDevice, mEmptyTexture.mImage, mEmptyTexture.mDeviceMemory, 0));
-
-    VkImageSubresourceRange subresourceRange{};
-    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subresourceRange.baseMipLevel = 0;
-    subresourceRange.levelCount = 1;
-    subresourceRange.layerCount = 1;
-
-    VkCommandBuffer copyCmd = m_pDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-    vks::tools::setImageLayout(copyCmd, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
-    vkCmdCopyBufferToImage(copyCmd, stagingBuffer, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
-    vks::tools::setImageLayout(copyCmd, mEmptyTexture.mImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
-    m_pDevice->flushCommandBuffer(copyCmd, transferQueue);
-    mEmptyTexture.mImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    // Clean up staging resources
-    vkFreeMemory(m_pDevice->logicalDevice, stagingMemory, nullptr);
-    vkDestroyBuffer(m_pDevice->logicalDevice, stagingBuffer, nullptr);
-
-    VkSamplerCreateInfo samplerCreateInfo = vks::initializers::samplerCreateInfo();
-    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
-    samplerCreateInfo.maxAnisotropy = 1.0f;
-    VK_CHECK_RESULT(vkCreateSampler(m_pDevice->logicalDevice, &samplerCreateInfo, nullptr, &mEmptyTexture.mSampler));
-
-    VkImageViewCreateInfo viewCreateInfo = vks::initializers::imageViewCreateInfo();
-    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    viewCreateInfo.subresourceRange.levelCount = 1;
-    viewCreateInfo.image = mEmptyTexture.mImage;
-    VK_CHECK_RESULT(vkCreateImageView(m_pDevice->logicalDevice, &viewCreateInfo, nullptr, &mEmptyTexture.mImageView));
-
-    mEmptyTexture.mDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    mEmptyTexture.mDescriptor.imageView = mEmptyTexture.mImageView;
-    mEmptyTexture.mDescriptor.sampler = mEmptyTexture.mSampler;
-}
-
-

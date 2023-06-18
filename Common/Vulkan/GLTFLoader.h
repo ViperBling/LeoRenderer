@@ -93,32 +93,34 @@ namespace LeoRenderer
             Texture*    mDiffuseTexture = nullptr;
             glm::vec4   mDiffuseFactor = glm::vec4(1.0f);
             glm::vec4   mSpecularFactor = glm::vec4(0.0f);
-        };
+        } mExtension;
         struct PBRWorkFlows
         {
             bool mbMetallicRoughness = true;
             bool mbSpecularGlossiness = false;
-        };
+        } mPBRWorkFlows;
         VkDescriptorSet mDescriptorSet{};
     };
 
     struct Dimensions
     {
-        glm::vec3 min = glm::vec3(FLT_MAX);
-        glm::vec3 max = glm::vec3(-FLT_MAX);
+        glm::vec3 mMin = glm::vec3(FLT_MAX);
+        glm::vec3 mMax = glm::vec3(-FLT_MAX);
     };
 
     struct Primitive
     {
-        Primitive(uint32_t firstIndex, uint32_t indexCount, Material& material) :
+        Primitive(uint32_t firstIndex, uint32_t indexCount, uint32_t vertexCount, Material& material) :
             mFirstIndex(firstIndex),
             mIndexCount(indexCount),
-            mMaterial(material) {};
+            mVertexCount(vertexCount),
+            mMaterial(material) { mbHasIndex = indexCount > 0; };
         void SetBoundingBox(glm::vec3 min, glm::vec3 max);
 
         uint32_t mFirstIndex;
         uint32_t mIndexCount;
         uint32_t mVertexCount{};
+        bool mbHasIndex;
         BoundingBox mBBox;
         Material& mMaterial;
     };
@@ -145,6 +147,8 @@ namespace LeoRenderer
 
         vks::VulkanDevice*      mDevice;
         std::vector<Primitive*> mPrimitives;
+        BoundingBox             mBBox;
+        BoundingBox             mAABB;
         std::string             mName;
     };
 
@@ -218,7 +222,7 @@ namespace LeoRenderer
         glm::vec3 mPos;
         glm::vec3 mNormal;
         glm::vec2 mUV0;
-        glm::vec4 mUV1;
+        glm::vec2 mUV1;
         glm::vec4 mColor;
         glm::vec4 mJoint0;
         glm::vec4 mWeight0;
@@ -250,12 +254,12 @@ namespace LeoRenderer
         GLTFModel() = default;
         ~GLTFModel();
         void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, LoaderInfo& loaderInfo, float globalScale);
-        void GetNodeProperpty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
+        void GetNodeProperty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
         void LoadSkins(tinygltf::Model& gltfModel);
         void LoadTextures(tinygltf::Model& gltfModel, vks::VulkanDevice* device, VkQueue transferQueue);
         VkSamplerAddressMode GetVkWrapMode(int32_t wrapMode);
         VkFilter GetVkFilterMode(int32_t filterMode);
-        void LoadeTextureSamplers(tinygltf::Model& gltfModel);
+        void LoadTextureSamplers(tinygltf::Model& gltfModel);
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);
         void LoadFromFile(std::string& filename, vks::VulkanDevice* device, VkQueue transferQueue, float scale = 1.0f);

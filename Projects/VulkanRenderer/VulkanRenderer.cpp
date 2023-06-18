@@ -1,6 +1,6 @@
 ﻿#include "VulkanRenderer.h"
 
-LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
+LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     title = "GLTF Test";
     camera.type = Camera::CameraType::lookat;
@@ -8,7 +8,6 @@ LeoRenderer::VulkanRenderer::VulkanRenderer() : VulkanFramework(true)
     camera.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
     camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
     camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-    settings.multiSampling = true;
 }
 
 LeoRenderer::VulkanRenderer::~VulkanRenderer()
@@ -66,17 +65,8 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 
         // Draw opaque
         vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.opaque);
-        mScene.Draw(
-            drawCmdBuffers[i],
-            LeoRenderer::BindImages | LeoRenderer::RenderOpaqueNodes,
-            mPipelineLayout);
+        mScene.Draw(drawCmdBuffers[i]);
 
-        // Draw mask
-        vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mBasePipeline.masked);
-        mScene.Draw(
-            drawCmdBuffers[i],
-            LeoRenderer::BindImages,
-            mPipelineLayout);
 
         DrawUI(drawCmdBuffers[i]);
         vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -87,8 +77,7 @@ void LeoRenderer::VulkanRenderer::BuildCommandBuffers()
 void LeoRenderer::VulkanRenderer::LoadGLTFFile(std::string& filename)
 {
     LeoRenderer::descriptorBindingFlags = LeoRenderer::DescriptorBindingFlags::ImageBaseColor | LeoRenderer::DescriptorBindingFlags::ImageNormalMap;
-    const uint32_t glTFLoadingFlags = LeoRenderer::FileLoadingFlags::PreTransformVertices | LeoRenderer::FileLoadingFlags::PreMultiplyVertexColors;
-    mScene.LoadFromFile(filename, vulkanDevice, queue, glTFLoadingFlags);
+    mScene.LoadFromFile(filename, vulkanDevice, queue);
 }
 
 void LeoRenderer::VulkanRenderer::LoadAssets()
@@ -129,7 +118,7 @@ void LeoRenderer::VulkanRenderer::SetupDescriptors()
         mDescSetLayouts,
         LeoRenderer::descriptorSetLayoutImage,
     };
-    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), 2);
+    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pPipelineLayoutCreateInfo, nullptr, &mPipelineLayout));
 
     // Descriptor set
@@ -158,6 +147,10 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
     shaderStageCIs[0] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     shaderStageCIs[1] = LoadShader(getShadersPath() + "VulkanRenderer/Lambert.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
+    const std::vector<VkVertexInputBindingDescription> vertexInputBindings =
+    {
+        vks::initializers::vertexInputBindingDescription(0, sizeof(LeoRenderer::Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+    };
     std::vector<LeoRenderer::VertexComponent> vertexComponents =
     {
         LeoRenderer::VertexComponent::Position,
@@ -166,7 +159,15 @@ void LeoRenderer::VulkanRenderer::PreparePipelines()
         LeoRenderer::VertexComponent::Color,
         LeoRenderer::VertexComponent::Tangent,
     };
-    VkPipelineVertexInputStateCreateInfo viStateCI = *LeoRenderer::Vertex::GetPipelineVertexInputState(vertexComponents);
+    const std::vector<VkVertexInputAttributeDescription> vertexInputAttributes =
+    {
+        vks::initializers::vertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mPos)),
+        vks::initializers::vertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mNormal)),
+        vks::initializers::vertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mUV0)),
+        vks::initializers::vertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mColor)),
+        vks::initializers::vertexInputAttributeDescription(0, 4, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mTangent)),
+    };
+    VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(vertexInputBindings, vertexInputAttributes);
 
     VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(mPipelineLayout, renderPass, 0);
     pipelineCI.pInputAssemblyState = &iaStateCI;
@@ -251,27 +252,11 @@ void LeoRenderer::VulkanRenderer::ViewChanged()
 
 void LeoRenderer::VulkanRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {
-    if (overlay->button("All"))
-    {
-        std::for_each(mScene.mNodes.begin(), mScene.mNodes.end(), [](LeoRenderer::Node* node) { node->visible = true; });
-        BuildCommandBuffers();
-    }
-    ImGui::SameLine();
-    if (overlay->button("None"))
-    {
-        std::for_each(mScene.mNodes.begin(), mScene.mNodes.end(), [](LeoRenderer::Node* node) { node->visible = false; });
-        BuildCommandBuffers();
-    }
-    ImGui::NewLine();
-
     // POI: Create a list of glTF nodes for visibility toggle
     ImGui::BeginChild("#Nodelist", ImVec2(200.0f * overlay->scale, 340.0f * overlay->scale), false);
     for (auto & node : mScene.mLinearNodes)
     {
-        if (overlay->checkBox(node->mName.c_str(), &node->visible))
-        {
-            BuildCommandBuffers();
-        }
+        BuildCommandBuffers();
     }
     ImGui::EndChild();
 }

@@ -174,7 +174,7 @@ public:
 		/** @brief Enable UI overlay */
 		bool overlay = true;
         bool multiSampling = true;
-        VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_4_BIT;
+        VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_4_BIT;;
 	} settings;
 
 	VkClearColorValue defaultClearColor = { { 0.025f, 0.025f, 0.025f, 1.0f } };
@@ -216,7 +216,7 @@ public:
 	HWND window;
 	HINSTANCE windowInstance;
 
-	explicit VulkanFramework(bool enableValidation = false);
+	explicit VulkanFramework(bool msaa = false, bool enableValidation = false);
 	virtual ~VulkanFramework();
 	/** @brief Setup the vulkan instance, enable required extensions and connect to the physical device (GPU) */
 	bool InitVulkan();
