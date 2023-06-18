@@ -108,7 +108,7 @@ public:
 
     void RenderNode(LeoRenderer::Node* node, uint32_t cbIndex, LeoRenderer::Material::AlphaMode alphaMode);
 
-    void LoadScene(std::string);
+    void LoadScene(std::string& filename);
     void LoadEnvironment(std::string);
     void LoadAssets();
     void SetupNodeDescriptorSet(LeoRenderer::Node* node);
@@ -143,6 +143,7 @@ public:
     VkPipeline mBoundPipeline = VK_NULL_HANDLE;
 
     std::vector<DescriptorSets> mDescSets;
+    std::vector<VkCommandBuffer> mCmdBuffers;
     std::vector<UniformBufferSet> mUniformBuffers;
 
     std::vector<VkFence> mWaitFence;

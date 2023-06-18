@@ -92,7 +92,7 @@ namespace LeoRenderer
             Texture*    mSpecularGlossinessTexture = nullptr;
             Texture*    mDiffuseTexture = nullptr;
             glm::vec4   mDiffuseFactor = glm::vec4(1.0f);
-            glm::vec4   mSpecularFactor = glm::vec4(0.0f);
+            glm::vec3   mSpecularFactor = glm::vec3(0.0f);
         } mExtension;
         struct PBRWorkFlows
         {
@@ -253,6 +253,7 @@ namespace LeoRenderer
     public:
         GLTFModel() = default;
         ~GLTFModel();
+        void OnDestroy();
         void LoadNode(LeoRenderer::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, LoaderInfo& loaderInfo, float globalScale);
         void GetNodeProperty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
         void LoadSkins(tinygltf::Model& gltfModel);

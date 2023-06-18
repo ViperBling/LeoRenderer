@@ -411,7 +411,6 @@ LeoRenderer::Node::~Node()
 
 // // ============================== Model ==============================
 
-
 LeoRenderer::GLTFModel::~GLTFModel()
 {
     if (mVertices.mVBuffer != VK_NULL_HANDLE)
@@ -430,6 +429,34 @@ LeoRenderer::GLTFModel::~GLTFModel()
     for (auto texture : mTextures) texture.OnDestroy();
     for (auto node : mNodes) delete node;
     for (auto skin : mSkins) delete skin;
+}
+
+void LeoRenderer::GLTFModel::OnDestroy()
+{
+    if (mVertices.mVBuffer != VK_NULL_HANDLE)
+    {
+        vkDestroyBuffer(m_pDevice->logicalDevice, mVertices.mVBuffer, nullptr);
+        vkFreeMemory(m_pDevice->logicalDevice, mVertices.mVMemory, nullptr);
+        mVertices.mVBuffer = VK_NULL_HANDLE;
+    }
+    if (mIndices.mIBuffer != VK_NULL_HANDLE)
+    {
+        vkDestroyBuffer(m_pDevice->logicalDevice, mIndices.mIBuffer, nullptr);
+        vkFreeMemory(m_pDevice->logicalDevice, mIndices.mIMemory, nullptr);
+        mIndices.mIBuffer = VK_NULL_HANDLE;
+    }
+
+    for (auto texture : mTextures) texture.OnDestroy();
+    for (auto node : mNodes) delete node;
+    for (auto skin : mSkins) delete skin;
+    mTextures.resize(0);
+    mTexSamplers.resize(0);
+    mMaterials.resize(0);
+    mAnimations.resize(0);
+    mNodes.resize(0);
+    mLinearNodes.resize(0);
+    mExtensions.resize(0);
+    mSkins.resize(0);
 }
 
 void LeoRenderer::GLTFModel::LoadNode(
@@ -848,7 +875,6 @@ void LeoRenderer::GLTFModel::LoadTextureSamplers(tinygltf::Model &gltfModel)
         mTexSamplers.push_back(sampler);
     }
 }
-
 
 void LeoRenderer::GLTFModel::LoadMaterials(tinygltf::Model &gltfModel)
 {
@@ -1394,3 +1420,5 @@ LeoRenderer::Node *LeoRenderer::GLTFModel::NodeFromIndex(uint32_t index)
     }
     return nodeFound;
 }
+
+
