@@ -109,7 +109,7 @@ public:
     void RenderNode(LeoRenderer::Node* node, uint32_t cbIndex, LeoRenderer::Material::AlphaMode alphaMode);
 
     void LoadScene(std::string& filename);
-    void LoadEnvironment(std::string);
+    void LoadEnvironment(std::string& filename);
     void LoadAssets();
     void SetupNodeDescriptorSet(LeoRenderer::Node* node);
     void SetDescriptors();

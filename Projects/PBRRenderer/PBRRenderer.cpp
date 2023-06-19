@@ -135,28 +135,341 @@ void PBRRenderer::LoadScene(std::string& filename)
     camera.setRotation({ 0.0f, 0.0f, 0.0f });
 }
 
-void PBRRenderer::LoadEnvironment(std::string)
+void PBRRenderer::LoadEnvironment(std::string& filename)
 {
-
+    std::cout << "Loading environment from " << filename << std::endl;
+    if (mTextures.mTexEnvCube.image) {
+        mTextures.mTexEnvCube.destroy();
+        mTextures.mTexIrradianceCube.destroy();
+        mTextures.mTexPreFilterCube.destroy();
+    }
+    mTextures.mTexEnvCube.loadFromFile(filename, VK_FORMAT_R16G16B16A16_SFLOAT, vulkanDevice, queue);
+    GenerateCubeMaps();
 }
 
 void PBRRenderer::LoadAssets()
 {
+    std::string assetPath = getAssetPath();
+    mTextures.mTexDummy.loadFromFile(assetPath + "Textures/empty.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
 
+    std::string sceneFile = assetPath + "Models/BusterDrone/busterDrone.gltf";
+    std::string envMapsFile = assetPath + "Textures/Env/papermill.ktx";
+    for (auto & arg : args)
+    {
+        if ((std::string(arg).find(".gltf") != std::string::npos) ||
+            (std::string(arg).find(".glb") != std::string::npos))
+        {
+            std::ifstream file(arg);
+            if (file.good()) sceneFile = arg;
+            else std::cout << "Could not load: " << arg << std::endl;
+        }
+        if (std::string(arg).find(".ktx") != std::string::npos)
+        {
+            std::ifstream file(arg);
+            if (file.good()) envMapsFile = arg;
+            else std::cout << "Could not laod: " << arg << std::endl;
+        }
+    }
+    LoadScene(sceneFile);
+    std::string skyBox = assetPath + "Models/Box/glTF-Embedded/Box.gltf";
+    mModels.mModelSkybox.LoadFromFile(skyBox, vulkanDevice, queue);
+
+    LoadEnvironment(envMapsFile);
 }
 
 void PBRRenderer::SetupNodeDescriptorSet(LeoRenderer::Node *node)
 {
+    if (node->mMesh)
+    {
+        VkDescriptorSetAllocateInfo descSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mDescSetLayouts.mDescLayoutNode, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAI, &node->mMesh->mUniformBuffer.descriptorSet));
 
+        VkWriteDescriptorSet writeDescSet{};
+        writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescSet.descriptorCount = 1;
+        writeDescSet.dstSet = node->mMesh->mUniformBuffer.descriptorSet;
+        writeDescSet.dstBinding = 0;
+        writeDescSet.pBufferInfo = &node->mMesh->mUniformBuffer.descriptor;
+        vkUpdateDescriptorSets(device, 1, &writeDescSet, 0, nullptr);
+    }
+    for (auto & child : node->mChildren) SetupNodeDescriptorSet(child);
 }
 
 void PBRRenderer::SetDescriptors()
 {
+    /*
+     * Descriptor Pool
+     */
+    uint32_t imageSamplerCount = 0;
+    uint32_t materialCount = 0;
+    uint32_t meshCount = 0;
+
+    // Environment samplers (radiance, irradiance, brdf lut)
+    imageSamplerCount += 3;
+
+    std::vector<LeoRenderer::GLTFModel*> modelList = { &mModels.mModelSkybox, &mModels.mModelScene };
+    for (auto &model : modelList)
+    {
+        for (auto &material : model->mMaterials)
+        {
+            imageSamplerCount += 5;
+            materialCount++;
+        }
+        for (auto node : model->mLinearNodes)
+        {
+            if (node->mMesh) meshCount++;
+        }
+    }
+
+    // 创建两个类型的Desc Pool，用于UBO和Sampler
+    std::vector<VkDescriptorPoolSize> poolSize =
+    {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, (4 + meshCount) * swapChain.imageCount},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount * swapChain.imageCount}
+    };
+    VkDescriptorPoolCreateInfo descPoolCI = vks::initializers::descriptorPoolCreateInfo(
+        poolSize,
+        (2 + materialCount + meshCount) * swapChain.imageCount);
+    VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descPoolCI, nullptr, &descriptorPool));
+
+    /*
+     * 分别为场景、材质、Node创建对应的描述符集
+     */
+
+    // 场景描述符集包括渲染场景时要用的贴图和Uniform值
+    // 1. 场景的Uniform Buffer
+    // 2. 场景渲染需要的三个图：辐照度图、预过滤图、BRDF图
+    {
+        std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings =
+        {
+            {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        };
+        VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindings);
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mDescSetLayouts.mDescLayoutScene));
+
+        for (auto i = 0; i < mDescSets.size(); i++)
+        {
+            VkDescriptorSetAllocateInfo descSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mDescSetLayouts.mDescLayoutScene, 1);
+            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAI, &mDescSets[i].mDescScene));
+
+            std::array<VkWriteDescriptorSet, 5> writeDescSets{};
+
+            writeDescSets[0] = vks::initializers::writeDescriptorSet(
+                mDescSets[i].mDescScene,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                0,
+                &mUniformBuffers[i].mUBOScene.descriptor,
+                1);
+            writeDescSets[1] = vks::initializers::writeDescriptorSet(
+                mDescSets[i].mDescScene,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                1,
+                &mUniformBuffers[i].mUBOParams.descriptor,
+                1);
+            writeDescSets[2] = vks::initializers::writeDescriptorSet(
+                mDescSets[i].mDescScene,
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                2,
+                &mTextures.mTexIrradianceCube.descriptor,
+                1);
+            writeDescSets[3] = vks::initializers::writeDescriptorSet(
+                mDescSets[i].mDescScene,
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                3,
+                &mTextures.mTexPreFilterCube.descriptor,
+                1);
+            writeDescSets[4] = vks::initializers::writeDescriptorSet(
+                mDescSets[i].mDescScene,
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                4,
+                &mTextures.mTexLUTBRDF.descriptor,
+                1);
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+        }
+    }
+
+    // 需要为物体的每个材质贴图创建描述符集
+    {
+        std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings =
+        {
+            {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        };
+        VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindings);
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &mDescSetLayouts.mDescLayoutMaterial));
+
+        // Per-Material descriptor sets
+        for (auto & mat : mModels.mModelScene.mMaterials)
+        {
+            VkDescriptorSetAllocateInfo descSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mDescSetLayouts.mDescLayoutMaterial, 1);
+            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAI, &mat.mDescriptorSet));
+
+            std::vector<VkDescriptorImageInfo> descImageInfo =
+            {
+                mTextures.mTexDummy.descriptor,
+                mTextures.mTexDummy.descriptor,
+                mat.mNormalTexture ? mat.mNormalTexture->mDescriptor : mTextures.mTexDummy.descriptor,
+                mat.mOcclusionTexture ? mat.mOcclusionTexture->mDescriptor : mTextures.mTexDummy.descriptor,
+                mat.mEmissiveTexture ? mat.mEmissiveTexture->mDescriptor : mTextures.mTexDummy.descriptor,
+            };
+
+            if (mat.mPBRWorkFlows.mbMetallicRoughness)
+            {
+                if (mat.mBaseColorTexture) descImageInfo[0] = mat.mBaseColorTexture->mDescriptor;
+                if (mat.mMetallicRoughnessTexture) descImageInfo[1] = mat.mMetallicRoughnessTexture->mDescriptor;
+            }
+            if (mat.mPBRWorkFlows.mbSpecularGlossiness)
+            {
+                if (mat.mExtension.mDiffuseTexture) descImageInfo[0] = mat.mExtension.mDiffuseTexture->mDescriptor;
+                if (mat.mExtension.mSpecularGlossinessTexture) descImageInfo[1] = mat.mExtension.mSpecularGlossinessTexture->mDescriptor;
+            }
+
+            std::array<VkWriteDescriptorSet, 5> writeDescSets{};
+
+            for (size_t i = 0; i < descImageInfo.size(); i++)
+            {
+                writeDescSets[i] = vks::initializers::writeDescriptorSet(
+                    mat.mDescriptorSet,
+                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    static_cast<uint32_t>(i),
+                    &descImageInfo[i],
+                    1);
+            }
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+        }
+        // Model node (Matrice)
+        {
+            std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindingsNodes =
+            {
+                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+            };
+
+            VkDescriptorSetLayoutCreateInfo descSetLayoutCINodes = vks::initializers::descriptorSetLayoutCreateInfo(descSetLayoutBindingsNodes);
+            VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCINodes, nullptr, &mDescSetLayouts.mDescLayoutNode));
+
+            for (auto & node : mModels.mModelScene.mNodes) SetupNodeDescriptorSet(node);
+        }
+    }
+
+    // 渲染天空球要用的描述符集
+    // 1. Uniform Buffer
+    // 2. 预过滤的立方体图
+    for (auto i = 0; i < mUniformBuffers.size(); i++)
+    {
+        VkDescriptorSetAllocateInfo descSetAI = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &mDescSetLayouts.mDescLayoutScene, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAI, &mDescSets[i].mDescSkybox));
+
+        std::array<VkWriteDescriptorSet, 3> writeDescSets{};
+
+        writeDescSets[0] = vks::initializers::writeDescriptorSet(
+            mDescSets[i].mDescSkybox,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            0,
+            &mUniformBuffers[i].mUBOSkybox.descriptor,
+            1);
+        writeDescSets[1] = vks::initializers::writeDescriptorSet(
+            mDescSets[i].mDescSkybox,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            1,
+            &mUniformBuffers[i].mUBOParams.descriptor,
+            1);
+        writeDescSets[2] = vks::initializers::writeDescriptorSet(
+            mDescSets[i].mDescSkybox,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            2,
+            &mTextures.mTexPreFilterCube.descriptor,
+            1);
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+    }
 
 }
 
 void PBRRenderer::PreparePipelines()
 {
+    VkPipelineInputAssemblyStateCreateInfo iaStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(
+        VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+    VkPipelineRasterizationStateCreateInfo rsStateCI = vks::initializers::pipelineRasterizationStateCreateInfo(
+        VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+    VkPipelineColorBlendAttachmentState cbAttachState = vks::initializers::pipelineColorBlendAttachmentState(
+        VK_COLOR_COMPONENT_R_BIT |
+        VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT |
+        VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
+    VkPipelineColorBlendStateCreateInfo cbStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(
+        1, &cbAttachState);
+    VkPipelineDepthStencilStateCreateInfo dsStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(
+        VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL);
+    VkPipelineViewportStateCreateInfo vpStateCI = vks::initializers::pipelineViewportStateCreateInfo(
+        1, 1, 0);
+    VkPipelineMultisampleStateCreateInfo msStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(
+        settings.multiSampling ?  settings.sampleCount : VK_SAMPLE_COUNT_1_BIT, 0);
+    const std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(
+        dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);
+
+    const std::vector<VkDescriptorSetLayout> descSetLayouts =
+    {
+        mDescSetLayouts.mDescLayoutScene,
+        mDescSetLayouts.mDescLayoutMaterial,
+        mDescSetLayouts.mDescLayoutNode
+    };
+    VkPushConstantRange pushConstRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(PushConstantBlockMaterial), 0);
+    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data());
+    pipelineLayoutCI.pushConstantRangeCount = 1;
+    pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &mPipelineLayout));
+
+    // Vertex Binding
+    const std::vector<VkVertexInputBindingDescription> viBindings =
+    {
+        vks::initializers::vertexInputBindingDescription(
+            0, sizeof(LeoRenderer::Vertex), VK_VERTEX_INPUT_RATE_VERTEX)
+    };
+
+    const std::vector<VkVertexInputAttributeDescription> viAttributes =
+    {
+        vks::initializers::vertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mPos)),
+        vks::initializers::vertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoRenderer::Vertex, mNormal)),
+        vks::initializers::vertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoRenderer::Vertex, mUV0)),
+        vks::initializers::vertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoRenderer::Vertex, mUV1)),
+        vks::initializers::vertexInputAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mColor)),
+        vks::initializers::vertexInputAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mJoint0)),
+        vks::initializers::vertexInputAttributeDescription(0, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mWeight0)),
+        vks::initializers::vertexInputAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mTangent)),
+    };
+    VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(viBindings, viAttributes);
+
+    // Pipelines
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+
+    VkGraphicsPipelineCreateInfo pipelineCI{};
+    pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineCI.layout = mPipelineLayout;
+    pipelineCI.renderPass = renderPass;
+    pipelineCI.pInputAssemblyState = &iaStateCI;
+    pipelineCI.pVertexInputState = &viStateCI;
+    pipelineCI.pRasterizationState = &rsStateCI;
+    pipelineCI.pColorBlendState = &cbStateCI;
+    pipelineCI.pMultisampleState = &msStateCI;
+    pipelineCI.pViewportState = &vpStateCI;
+    pipelineCI.pDepthStencilState = &dsStateCI;
+    pipelineCI.pDynamicState = &dyStateCI;
+    pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
+    pipelineCI.pStages = shaderStages.data();
+
+    shaderStages = {
+        LoadShader("skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader("skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+    };
 
 }
 
