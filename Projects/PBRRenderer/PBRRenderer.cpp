@@ -470,12 +470,248 @@ void PBRRenderer::PreparePipelines()
         LoadShader("skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
         LoadShader("skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelineSkyBox));
+    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 
+    shaderStages = {
+        LoadShader("PBR.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader("PBR_KHR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+    };
+    dsStateCI.depthWriteEnable = VK_TRUE;
+    dsStateCI.depthTestEnable = VK_TRUE;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelinePBR))
+    rsStateCI.cullMode = VK_CULL_MODE_NONE;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelineDoubleSided))
+
+    rsStateCI.cullMode = VK_CULL_MODE_NONE;
+    cbAttachState.blendEnable = VK_TRUE;
+    cbAttachState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    cbAttachState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    cbAttachState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    cbAttachState.colorBlendOp = VK_BLEND_OP_ADD;
+    cbAttachState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    cbAttachState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    cbAttachState.alphaBlendOp = VK_BLEND_OP_ADD;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelinePBRAlphaBlend));
+
+    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 }
 
 void PBRRenderer::GenerateBRDFLUT()
 {
+    auto tStart = std::chrono::high_resolution_clock::now();
 
+    const VkFormat format = VK_FORMAT_R16G16_SFLOAT;
+    const int32_t dim = 512;
+
+    // Image
+    VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
+    imageCI.imageType = VK_IMAGE_TYPE_2D;
+    imageCI.format = format;
+    imageCI.extent = { dim, dim, 1};
+    imageCI.mipLevels = 1;
+    imageCI.arrayLayers = 1;
+    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCI.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &mTextures.mTexLUTBRDF.image));
+    // Image memory
+    VkMemoryRequirements memReqs;
+    vkGetImageMemoryRequirements(device, mTextures.mTexLUTBRDF.image, &memReqs);
+    VkMemoryAllocateInfo memoryAI = vks::initializers::memoryAllocateInfo();
+    memoryAI.allocationSize = memReqs.size;
+    memoryAI.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(vkAllocateMemory(device, &memoryAI, nullptr, &mTextures.mTexLUTBRDF.deviceMemory))
+    VK_CHECK_RESULT(vkBindImageMemory(device, mTextures.mTexLUTBRDF.image, mTextures.mTexLUTBRDF.deviceMemory, 0))
+
+    // Image view
+    VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
+    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewCI.format = format;
+    imageViewCI.subresourceRange = {};
+    imageViewCI.subresourceRange.levelCount = 1;
+    imageViewCI.subresourceRange.layerCount = 1;
+    imageViewCI.image = mTextures.mTexLUTBRDF.image;
+    VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &mTextures.mTexLUTBRDF.view));
+
+    // Sampler
+    VkSamplerCreateInfo samplerCI = vks::initializers::samplerCreateInfo();
+    samplerCI.magFilter = VK_FILTER_LINEAR;
+    samplerCI.minFilter = VK_FILTER_LINEAR;
+    samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCI.minLod = 0.0f;
+    samplerCI.maxLod = 1.0f;
+    samplerCI.maxAnisotropy = 1.0f;
+    samplerCI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    VK_CHECK_RESULT(vkCreateSampler(device, &samplerCI, nullptr, &mTextures.mTexLUTBRDF.sampler))
+
+    VkAttachmentDescription attachDesc{};
+    // Color Attachment
+    attachDesc.format = format;
+    attachDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+    VkSubpassDescription subpassDesc{};
+    subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpassDesc.colorAttachmentCount = 1;
+    subpassDesc.pColorAttachments = &colorReference;
+
+    // Use subpass dependencies for layout transitions
+    std::array<VkSubpassDependency, 2> subpassDependencies{};
+    subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencies[0].dstSubpass = 0;
+    subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    subpassDependencies[1].srcSubpass = 0;
+    subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    subpassDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    // Create the actual Render Pass
+    VkRenderPassCreateInfo rpCI = vks::initializers::renderPassCreateInfo();
+    rpCI.attachmentCount = 1;
+    rpCI.pAttachments = &attachDesc;
+    rpCI.subpassCount = 1;
+    rpCI.pSubpasses = &subpassDesc;
+    rpCI.dependencyCount = 2;
+    rpCI.pDependencies = subpassDependencies.data();
+    VkRenderPass renderPass;
+    VK_CHECK_RESULT(vkCreateRenderPass(device, &rpCI, nullptr, &renderPass))
+
+    // FrameBuffer
+    VkFramebufferCreateInfo frameBufferCI = vks::initializers::framebufferCreateInfo();
+    frameBufferCI.renderPass = renderPass;
+    frameBufferCI.attachmentCount = 1;
+    frameBufferCI.pAttachments = &mTextures.mTexLUTBRDF.view;
+    frameBufferCI.width = dim;
+    frameBufferCI.height = dim;
+    frameBufferCI.layers = 1;
+    VkFramebuffer frameBuffer;
+    VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCI, nullptr, &frameBuffer));
+
+    // Descriptors
+    VkDescriptorSetLayout descSetLayout;
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCI{};
+    descSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &descSetLayout))
+
+    // Pipeline Layout
+    VkPipelineLayout pipelineLayout{};
+    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descSetLayout, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout))
+
+    VkPipelineInputAssemblyStateCreateInfo iaStateCI{};
+    iaStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    iaStateCI.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineRasterizationStateCreateInfo rsStateCI = vks::initializers::pipelineRasterizationStateCreateInfo(
+        VK_POLYGON_MODE_FILL,
+        VK_CULL_MODE_NONE,
+        VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
+    VkPipelineColorBlendAttachmentState cbAttachState = vks::initializers::pipelineColorBlendAttachmentState(
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        VK_FALSE);
+
+    VkPipelineColorBlendStateCreateInfo cbStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(1, &cbAttachState);
+
+    VkPipelineDepthStencilStateCreateInfo dsStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(
+        VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+    VkPipelineViewportStateCreateInfo vpStateCI = vks::initializers::pipelineViewportStateCreateInfo(1, 1);
+
+    VkPipelineMultisampleStateCreateInfo msStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
+
+    std::vector<VkDynamicState> dyStateEnable = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+
+    VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dyStateEnable);
+
+    VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo();
+
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{
+        LoadShader("GenerateBRDFLUT.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader("GenerateBRDFLUT.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+    };
+
+    VkGraphicsPipelineCreateInfo gfxPipelineCI{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    gfxPipelineCI.layout = pipelineLayout;
+    gfxPipelineCI.renderPass = renderPass;
+    gfxPipelineCI.pInputAssemblyState = &iaStateCI;
+    gfxPipelineCI.pVertexInputState = &viStateCI;
+    gfxPipelineCI.pRasterizationState = &rsStateCI;
+    gfxPipelineCI.pColorBlendState = &cbStateCI;
+    gfxPipelineCI.pMultisampleState = &msStateCI;
+    gfxPipelineCI.pViewportState = &vpStateCI;
+    gfxPipelineCI.pDepthStencilState = &dsStateCI;
+    gfxPipelineCI.pDynamicState = &dyStateCI;
+    gfxPipelineCI.stageCount = 2;
+    gfxPipelineCI.pStages = shaderStages.data();
+
+    VkPipeline pipeline;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &gfxPipelineCI, nullptr, &pipeline))
+    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+
+    // Render LUT
+    VkClearValue clearValue[1];
+    clearValue[0].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+
+    VkRenderPassBeginInfo rpBI = vks::initializers::renderPassBeginInfo();
+    rpBI.renderPass = renderPass;
+    rpBI.renderArea.extent = {dim, dim};
+    rpBI.clearValueCount = 1;
+    rpBI.pClearValues = clearValue;
+    rpBI.framebuffer = frameBuffer;
+
+    VkCommandBuffer cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+    vkCmdBeginRenderPass(cmdBuffer, &rpBI, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.width = float(dim);
+    viewport.height = float(dim);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.extent = {dim, dim};
+
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
+    vkCmdEndRenderPass(cmdBuffer);
+    vulkanDevice->flushCommandBuffer(cmdBuffer, queue);
+    // Sync
+    vkQueueWaitIdle(queue);
+    // Destroy
+    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyRenderPass(device, renderPass, nullptr);
+    vkDestroyFramebuffer(device, frameBuffer, nullptr);
+    vkDestroyDescriptorSetLayout(device, descSetLayout, nullptr);
+
+    mTextures.mTexLUTBRDF.descriptor.imageView = mTextures.mTexLUTBRDF.view;
+    mTextures.mTexLUTBRDF.descriptor.sampler = mTextures.mTexLUTBRDF.sampler;
+    mTextures.mTexLUTBRDF.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    mTextures.mTexLUTBRDF.device = vulkanDevice;
+
+    auto tEnd = std::chrono::high_resolution_clock::now();
+    auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+    std::cout << "Generating BRDF LUT took: " << tDiff << " ms." << std::endl;
 }
 
 void PBRRenderer::GenerateCubeMaps()
