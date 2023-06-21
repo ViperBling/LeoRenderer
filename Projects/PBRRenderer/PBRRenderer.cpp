@@ -716,7 +716,133 @@ void PBRRenderer::GenerateBRDFLUT()
 
 void PBRRenderer::GenerateCubeMaps()
 {
+    enum Target { IRRADIANCE = 0, PREFILTEREDENV = 1 };
 
+    for (uint32_t target = 0; target < PREFILTEREDENV + 1; target++)
+    {
+        vks::TextureCubeMap cubeMap;
+
+        auto tStart = std::chrono::high_resolution_clock::now();
+
+        VkFormat format;
+        uint32_t dim;
+
+        switch (target)
+        {
+            case IRRADIANCE:
+                format = VK_FORMAT_R32G32B32A32_SFLOAT;
+                dim = 64;
+                break;
+            case PREFILTEREDENV:
+                format = VK_FORMAT_R16G16B16A16_SFLOAT;
+                dim = 512;
+                break;
+        }
+        const uint32_t numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
+
+        // Create Cube Map
+        {
+            // Image
+            VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
+            imageCI.imageType = VK_IMAGE_TYPE_2D;
+            imageCI.format = format;
+            imageCI.extent = {dim, dim, 1};
+            imageCI.mipLevels = numMips;
+            imageCI.arrayLayers = 6;
+            imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageCI.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            imageCI.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+            VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &cubeMap.image));
+            VkMemoryRequirements memReqs;
+            vkGetImageMemoryRequirements(device, cubeMap.image, &memReqs);
+            VkMemoryAllocateInfo memAI = vks::initializers::memoryAllocateInfo();
+            memAI.allocationSize = memReqs.size;
+            memAI.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &memAI, nullptr, &cubeMap.deviceMemory))
+            VK_CHECK_RESULT(vkBindImageMemory(device, cubeMap.image, cubeMap.deviceMemory, 0))
+
+            // Image View
+            VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
+            imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+            imageViewCI.format = format;
+            imageViewCI.subresourceRange = {
+                VK_IMAGE_ASPECT_COLOR_BIT, numMips, 6
+            };
+            imageViewCI.image = cubeMap.image;
+            VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &cubeMap.view))
+
+            // Sampler
+            VkSamplerCreateInfo samplerCI = vks::initializers::samplerCreateInfo();
+            samplerCI.magFilter = VK_FILTER_LINEAR;
+            samplerCI.minFilter = VK_FILTER_LINEAR;
+            samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerCI.minLod = 0.0f;
+            samplerCI.maxLod = static_cast<float>(numMips);
+            samplerCI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+            VK_CHECK_RESULT(vkCreateSampler(device, &samplerCI, nullptr, &cubeMap.sampler));
+        }
+
+        // FrameBuffer, Attachment, RenderPass, Pipelines
+        VkAttachmentDescription attachDesc{};
+        // Color Attachment
+        attachDesc.format = format;
+        attachDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+        VkSubpassDescription subpassDesc{};
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.colorAttachmentCount = 1;
+        subpassDesc.pColorAttachments = &colorReference;
+
+        // Use subpass dependencies for layout transitions
+        std::array<VkSubpassDependency, 2> subpassDependencies{};
+        subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDependencies[0].dstSubpass = 0;
+        subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        subpassDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        subpassDependencies[1].srcSubpass = 0;
+        subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        subpassDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        // Renderpass
+        VkRenderPassCreateInfo renderPassCI{};
+        renderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCI.attachmentCount = 1;
+        renderPassCI.pAttachments = &attachDesc;
+        renderPassCI.subpassCount = 1;
+        renderPassCI.pSubpasses = &subpassDesc;
+        renderPassCI.dependencyCount = 2;
+        renderPassCI.pDependencies = subpassDependencies.data();
+        VkRenderPass renderPass;
+        VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassCI, nullptr, &renderPass))
+
+        struct Offscreen
+        {
+            VkImage osImage;
+            VkImageView osImageView;
+            VkDeviceMemory osImageMemory;
+            VkFramebuffer osFrameBuffer;
+        } offscreen;
+
+
+    }
 }
 
 void PBRRenderer::PrepareUniformBuffers()
