@@ -766,9 +766,9 @@ void PBRRenderer::GenerateCubeMaps()
             VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
             imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
             imageViewCI.format = format;
-            imageViewCI.subresourceRange = {
-                VK_IMAGE_ASPECT_COLOR_BIT, numMips, 6
-            };
+            imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            imageViewCI.subresourceRange.levelCount = numMips;
+            imageViewCI.subresourceRange.layerCount = 6;
             imageViewCI.image = cubeMap.image;
             VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &cubeMap.view))
 
@@ -840,6 +840,88 @@ void PBRRenderer::GenerateCubeMaps()
             VkDeviceMemory osImageMemory;
             VkFramebuffer osFrameBuffer;
         } offscreen;
+
+        // Create Offscreen Framebuffer
+        {
+            // Image
+            VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
+            imageCI.imageType = VK_IMAGE_TYPE_2D;
+            imageCI.format = format;
+            imageCI.extent = {dim, dim, 1};
+            imageCI.mipLevels = 1;
+            imageCI.arrayLayers = 1;
+            imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageCI.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &offscreen.osImage));
+            VkMemoryRequirements memReqs;
+            vkGetImageMemoryRequirements(device, offscreen.osImage, &memReqs);
+            VkMemoryAllocateInfo memAI = vks::initializers::memoryAllocateInfo();
+            memAI.allocationSize = memReqs.size;
+            memAI.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &memAI, nullptr, &offscreen.osImageMemory))
+            VK_CHECK_RESULT(vkBindImageMemory(device, offscreen.osImage, offscreen.osImageMemory, 0))
+
+            // Image View
+            VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
+            imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            imageViewCI.format = format;
+            imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            imageViewCI.subresourceRange.baseMipLevel = 0;
+            imageViewCI.subresourceRange.levelCount = 1;
+            imageViewCI.subresourceRange.baseArrayLayer = 0;
+            imageViewCI.subresourceRange.layerCount = 1;
+            imageViewCI.image = offscreen.osImage;
+            VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &offscreen.osImageView))
+
+            // Framebuffer
+            VkFramebufferCreateInfo frameBufferCI = vks::initializers::framebufferCreateInfo();
+            frameBufferCI.renderPass = renderPass;
+            frameBufferCI.attachmentCount = 1;
+            frameBufferCI.pAttachments = &offscreen.osImageView;
+            frameBufferCI.width = dim;
+            frameBufferCI.height = dim;
+            frameBufferCI.layers = 1;
+            VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCI, nullptr, &offscreen.osFrameBuffer))
+
+            VkCommandBuffer cmdLayout = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+            VkImageMemoryBarrier imageMemoryBarrier = vks::initializers::imageMemoryBarrier();
+            imageMemoryBarrier.image = offscreen.osImage;
+            imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            imageMemoryBarrier.srcAccessMask = 0;
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            imageMemoryBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(
+                cmdLayout,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                0, 0, nullptr,
+                0, nullptr,
+                1, &imageMemoryBarrier);
+            vulkanDevice->flushCommandBuffer(cmdLayout, queue, true);
+        }
+
+        // Descriptors
+        VkDescriptorSetLayout descSetLayout{};
+        VkDescriptorSetLayoutBinding descSetLayoutBinding = {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+        VkDescriptorSetLayoutCreateInfo descSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(&descSetLayoutBinding, 1);
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descSetLayoutCI, nullptr, &descSetLayout))
+
+        // DescPool
+        VkDescriptorPoolSize poolSize = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1};
+        VkDescriptorPoolCreateInfo descPoolCI = vks::initializers::descriptorPoolCreateInfo(1, &poolSize, 2);
+        VkDescriptorPool descPool;
+        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descPoolCI, nullptr, &descPool))
+
+        // DescSets
+        VkDescriptorSet descSet;
+        VkDescriptorSetAllocateInfo descSetAI = vks::initializers::descriptorSetAllocateInfo(descPool, &descSetLayout, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descSetAI, &descSet));
+        VkWriteDescriptorSet writeDescSet = vks::initializers::writeDescriptorSet(descSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &mTextures.mTexEnvCube.descriptor, 1);
+        vkUpdateDescriptorSets(device, 1, &writeDescSet, 0, nullptr);
 
 
     }
