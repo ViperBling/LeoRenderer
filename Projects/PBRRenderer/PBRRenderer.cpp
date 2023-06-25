@@ -923,7 +923,132 @@ void PBRRenderer::GenerateCubeMaps()
         VkWriteDescriptorSet writeDescSet = vks::initializers::writeDescriptorSet(descSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &mTextures.mTexEnvCube.descriptor, 1);
         vkUpdateDescriptorSets(device, 1, &writeDescSet, 0, nullptr);
 
+        struct PushBlockIrradiance
+        {
+            glm::mat4 mMVP;
+            float mDeltaPhi = (2.0f * float(M_PI)) / 180.0f;
+            float mDeltaTheta = (0.5f * float(M_PI)) / 64.0f;
+        } pushBlockIrradiance;
+        struct PushBlockPreFilterEnv
+        {
+            glm::mat4 mMVP;
+            float mRoughness = 0.0f;
+            uint32_t mNumSamples = 32u;
+        } pushBlockPreFilterEnv;
 
+        // Pipeline Layout
+        VkPipelineLayout pipelineLayout;
+        VkPushConstantRange pushConstRange{};
+        pushConstRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        switch (target)
+        {
+            case IRRADIANCE:
+                pushConstRange.size = sizeof(PushBlockIrradiance);
+                break;
+            case PREFILTEREDENV:
+                pushConstRange.size = sizeof(PushBlockPreFilterEnv);
+                break;
+            default:
+                break;
+        }
+
+        VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descSetLayout, 1);
+        pipelineLayoutCI.pushConstantRangeCount = 1;
+        pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
+        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout))
+
+        // Pipeline
+        VkPipelineInputAssemblyStateCreateInfo iaStateCI{};
+        iaStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        iaStateCI.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+        VkPipelineRasterizationStateCreateInfo rsStateCI{};
+        rsStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rsStateCI.polygonMode = VK_POLYGON_MODE_FILL;
+        rsStateCI.cullMode = VK_CULL_MODE_NONE;
+        rsStateCI.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rsStateCI.lineWidth = 1.0f;
+
+        VkPipelineColorBlendAttachmentState cbAttachState{};
+        cbAttachState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        cbAttachState.blendEnable = VK_FALSE;
+        VkPipelineColorBlendStateCreateInfo cbStateCI{};
+        cbStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        cbStateCI.attachmentCount = 1;
+        cbStateCI.pAttachments = &cbAttachState;
+
+        VkPipelineDepthStencilStateCreateInfo dsStateCI{};
+        dsStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        dsStateCI.depthTestEnable = VK_FALSE;
+        dsStateCI.depthWriteEnable = VK_FALSE;
+        dsStateCI.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        dsStateCI.front = dsStateCI.back;
+        dsStateCI.back.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        VkPipelineViewportStateCreateInfo vpStateCI{};
+        vpStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        vpStateCI.viewportCount = 1;
+        vpStateCI.scissorCount = 1;
+
+        VkPipelineMultisampleStateCreateInfo msStateCI{};
+        msStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        msStateCI.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        std::vector<VkDynamicState> dyStateEnabled = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dyStateCI{};
+        dyStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dyStateCI.pDynamicStates = dyStateEnabled.data();
+        dyStateCI.dynamicStateCount = static_cast<uint32_t>(dyStateEnabled.size());
+
+        // Vertex Input
+        VkVertexInputBindingDescription viBinding = { 0, sizeof(LeoRenderer::Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
+        VkVertexInputAttributeDescription viAttribute = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+
+        VkPipelineVertexInputStateCreateInfo viStateCI{};
+        viStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        viStateCI.vertexBindingDescriptionCount = 1;
+        viStateCI.pVertexBindingDescriptions = &viBinding;
+        viStateCI.vertexAttributeDescriptionCount = 1;
+        viStateCI.pVertexAttributeDescriptions = &viAttribute;
+
+        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+
+        VkGraphicsPipelineCreateInfo gfxPipelineCI{};
+        gfxPipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        gfxPipelineCI.layout = pipelineLayout;
+        gfxPipelineCI.renderPass = renderPass;
+        gfxPipelineCI.pInputAssemblyState = &iaStateCI;
+        gfxPipelineCI.pVertexInputState = &viStateCI;
+        gfxPipelineCI.pRasterizationState = &rsStateCI;
+        gfxPipelineCI.pColorBlendState = &cbStateCI;
+        gfxPipelineCI.pMultisampleState = &msStateCI;
+        gfxPipelineCI.pViewportState = &vpStateCI;
+        gfxPipelineCI.pDepthStencilState = &dsStateCI;
+        gfxPipelineCI.pDynamicState = &dyStateCI;
+        gfxPipelineCI.stageCount = 2;
+        gfxPipelineCI.pStages = shaderStages.data();
+        gfxPipelineCI.renderPass = renderPass;
+
+        shaderStages[0] = LoadShader("FilterCube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+        switch (target)
+        {
+            case IRRADIANCE:
+                shaderStages[1] = LoadShader("IrradianceCube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+                break;
+            case PREFILTEREDENV:
+                shaderStages[1] = LoadShader("PrefilterEnvMap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+                break;
+            default:
+                break;
+        }
+        VkPipeline pipeline;
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &gfxPipelineCI, nullptr, &pipeline))
+        for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+
+        // Render Cubemap
+        VkClearValue clearValue[1];
+        clearValue[0].color = { {0.0f, 0.0f, 0.2f, 0.0f} };
     }
 }
 
