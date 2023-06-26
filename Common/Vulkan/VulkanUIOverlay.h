@@ -8,13 +8,14 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cassert>
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
 #include <vulkan/vulkan.h>
 #include "VulkanTools.h"
@@ -85,7 +86,7 @@ namespace vks
 		bool inputFloat(const char* caption, float* value, float step, uint32_t precision);
 		bool sliderFloat(const char* caption, float* value, float min, float max);
 		bool sliderInt(const char* caption, int32_t* value, int32_t min, int32_t max);
-        bool combo(const char *caption, std::string &selectedKey, std::map<std::string, std::string> items);
+        bool combo(const char *caption, std::string& selectedKey, std::map<std::string, std::string> items);
 		bool comboBox(const char* caption, int32_t* itemindex, std::vector<std::string> items);
 		bool button(const char* caption);
 		bool colorPicker(const char* caption, float* color);

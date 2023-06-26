@@ -8,8 +8,6 @@
 */
 
 #include "VulkanUIOverlay.h"
-#include <iostream>
-#include <map>
 
 namespace vks 
 {
@@ -482,7 +480,22 @@ namespace vks
 
 	bool UIOverlay::combo(const char *caption, std::string &selectedKey, std::map<std::string, std::string> items)
 	{
-		return false;
+		bool selectionChanged = false;
+        if (ImGui::BeginCombo(caption, selectedKey.c_str()))
+        {
+            for (auto it = items.begin(); it != items.end(); ++it)
+            {
+                const bool isSelected = it->first == selectedKey;
+                if (ImGui::Selectable(it->first.c_str(), isSelected))
+                {
+                    selectionChanged = it->first != selectedKey;
+                    selectedKey = it->first;
+                }
+                if (isSelected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        return selectionChanged;
 	}
 
 	bool UIOverlay::comboBox(const char *caption, int32_t *itemindex, std::vector<std::string> items)
@@ -492,10 +505,10 @@ namespace vks
 		}
 		std::vector<const char*> charitems;
 		charitems.reserve(items.size());
-		for (size_t i = 0; i < items.size(); i++) {
-			charitems.push_back(items[i].c_str());
+		for (const auto & item : items) {
+			charitems.push_back(item.c_str());
 		}
-		uint32_t itemCount = static_cast<uint32_t>(charitems.size());
+		auto itemCount = static_cast<uint32_t>(charitems.size());
 		bool res = ImGui::Combo(caption, itemindex, &charitems[0], itemCount, itemCount);
 		if (res) { updated = true; };
 		return res;

@@ -1,4 +1,4 @@
-#include "PBRRenderer.h"
+﻿#include "PBRRenderer.h"
 
 PBRRenderer::PBRRenderer() : VulkanFramework(ENABLE_MSAA, ENABLE_VALIDATION)
 {
@@ -1501,12 +1501,58 @@ void PBRRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
                 updateCBs = true;
             }
         }
-        if (UIOverlay.comboBox("Environment", mSelectedEnvironment, mEnvironments)) {
+        if (UIOverlay.combo("Environment", mSelectedEnvironment, mEnvironments))
+        {
             vkDeviceWaitIdle(device);
-            loadEnvironment(environments[selectedEnvironment]);
-            setupDescriptors();
+            LoadEnvironment(mEnvironments[mSelectedEnvironment]);
+            SetDescriptors();
             updateCBs = true;
         }
+    }
+
+    if (UIOverlay.header("Environment"))
+    {
+        if (UIOverlay.checkBox("Background", &mbDisplayBackground)) updateShaderParams = true;
+        if (UIOverlay.sliderFloat("Exposure", &mShaderParams.mParamExposure, 0.1f, 10.0f)) updateShaderParams = true;
+        if (UIOverlay.sliderFloat("Gamma", &mShaderParams.mParamGamma, 0.1f, 4.0f)) updateShaderParams = true;
+        if (UIOverlay.sliderFloat("IBL", &mShaderParams.mParamScaleIBLAmbient, 0.0f, 1.0f)) updateShaderParams = true;
+    }
+    if (UIOverlay.header("Debug view"))
+    {
+        const std::vector<std::string> debugNameInputs = {
+            "None", "Base Color", "Normal", "Occlusion", "Emissive", "Metallic", "Roughness"
+        };
+        if (UIOverlay.comboBox("Inputs", &mDebugViewInputs, debugNameInputs))
+        {
+            mShaderParams.mParamDebugViewInputs = static_cast<float>(mDebugViewInputs);
+            updateShaderParams = true;
+        }
+        const std::vector<std::string> debugNameEquation = {
+            "None", "Diff(l, n)", "F(l, h)", "G(l, v, h)", "D(h)", "Specular"
+        };
+        if (UIOverlay.comboBox("PBR Equation", &mDebugViewEquation, debugNameEquation))
+        {
+            mShaderParams.mParamDebugViewEquation = static_cast<float>(mDebugViewEquation);
+            updateShaderParams = true;
+        }
+    }
+    if (!mModels.mModelScene.mAnimations.empty())
+    {
+        if (UIOverlay.header("Animations"))
+        {
+            UIOverlay.checkBox("Animate", &mbAnimate);
+            std::vector<std::string> animNames;
+            for (auto animation : mModels.mModelScene.mAnimations)
+            {
+                animNames.push_back(animation.mName);
+            }
+            UIOverlay.comboBox("Animation", &mAnimationIndex, animNames);
+        }
+    }
+
+    if (updateShaderParams)
+    {
+        UpdateParams();
     }
 }
 
@@ -1516,4 +1562,26 @@ void PBRRenderer::FileDropped(std::string &filename)
     LoadScene(filename);
     SetDescriptors();
     BuildCommandBuffers();
+}
+
+PBRRenderer* pbrRenderer;
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    if (pbrRenderer != nullptr)
+    {
+        pbrRenderer->HandleMessages(hWnd, uMsg, wParam, lParam);
+    }
+    return (DefWindowProc(hWnd, uMsg, wParam, lParam));
+}
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+{
+    for (int32_t i = 0; i < __argc; i++) { VulkanFramework::args.push_back(__argv[i]); };
+    pbrRenderer = new PBRRenderer();
+    pbrRenderer->InitVulkan();
+    pbrRenderer->SetupWindow(hInstance, WndProc);
+    pbrRenderer->Prepare();
+    pbrRenderer->RenderLoop();
+    delete(pbrRenderer);
+    return 0;
 }
