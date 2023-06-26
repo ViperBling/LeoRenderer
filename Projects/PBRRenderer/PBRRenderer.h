@@ -146,7 +146,6 @@ public:
     std::vector<VkCommandBuffer> mCmdBuffers;
     std::vector<UniformBufferSet> mUniformBuffers;
 
-    std::vector<VkFence> mWaitFence;
     std::vector<VkSemaphore> mRenderCompleteSemaphore;
     std::vector<VkSemaphore> mPresentCompleteSemaphore;
 

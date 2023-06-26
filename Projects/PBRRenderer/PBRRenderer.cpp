@@ -22,7 +22,7 @@ PBRRenderer::~PBRRenderer()
         buffer.mUBOScene.destroy();
         buffer.mUBOSkybox.destroy();
     }
-    for (auto fence : mWaitFence) vkDestroyFence(device, fence, nullptr);
+    for (auto fence : waitFences) vkDestroyFence(device, fence, nullptr);
     for (auto sem : mRenderCompleteSemaphore) vkDestroySemaphore(device, sem, nullptr);
     for (auto sem : mPresentCompleteSemaphore) vkDestroySemaphore(device, sem, nullptr);
 
@@ -1049,22 +1049,231 @@ void PBRRenderer::GenerateCubeMaps()
         // Render Cubemap
         VkClearValue clearValue[1];
         clearValue[0].color = { {0.0f, 0.0f, 0.2f, 0.0f} };
+
+        VkRenderPassBeginInfo rpBI = vks::initializers::renderPassBeginInfo();
+        rpBI.renderPass = renderPass;
+        rpBI.framebuffer = offscreen.osFrameBuffer;
+        rpBI.renderArea.extent = {dim, dim};
+        rpBI.clearValueCount = 1;
+        rpBI.pClearValues = clearValue;
+
+        std::vector<glm::mat4> matrices = {
+            glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+            glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+            glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+            glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+            glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+            glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+        };
+
+        VkCommandBuffer cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+
+        VkViewport viewport{};
+        viewport.width = (float)dim;
+        viewport.height = (float)dim;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.extent.width = dim;
+        scissor.extent.height = dim;
+
+        VkImageSubresourceRange subresourceRange{};
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = numMips;
+        subresourceRange.layerCount = 6;
+
+        // Change image layout for all cubemap faces to transfer destination
+        {
+            vulkanDevice->beginCommandBuffer(cmdBuffer);
+            VkImageMemoryBarrier imageMemBarrier = vks::initializers::imageMemoryBarrier();
+            imageMemBarrier.image = cubeMap.image;
+            imageMemBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageMemBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            imageMemBarrier.srcAccessMask = 0;
+            imageMemBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            imageMemBarrier.subresourceRange = subresourceRange;
+            vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemBarrier);
+            vulkanDevice->flushCommandBuffer(cmdBuffer, queue, false);
+        }
+
+        for (uint32_t m = 0; m < numMips; m++)
+        {
+            for (uint32_t f = 0; f < 6; f++)
+            {
+                vulkanDevice->beginCommandBuffer(cmdBuffer);
+
+                viewport.width = static_cast<float>(dim * std::pow(0.5f, m));
+                viewport.height = static_cast<float>(dim * std::pow(0.5f, m));
+                vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+                vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+                // 从CubeMap的面方向向量渲染
+                vkCmdBeginRenderPass(cmdBuffer, &rpBI, VK_SUBPASS_CONTENTS_INLINE);
+
+                switch (target) {
+                    case IRRADIANCE:
+                        pushBlockIrradiance.mMVP = glm::perspective((float)(M_PI / 2.0), 1.0f, 0.1f, 512.0f) * matrices[f];
+                        vkCmdPushConstants(cmdBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushBlockIrradiance), &pushBlockIrradiance);
+                        break;
+                    case PREFILTEREDENV:
+                        pushBlockPreFilterEnv.mMVP = glm::perspective((float)(M_PI / 2.0), 1.0f, 0.1f, 512.0f) * matrices[f];
+                        pushBlockPreFilterEnv.mRoughness = (float)m / (float)(numMips - 1);
+                        vkCmdPushConstants(cmdBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushBlockPreFilterEnv), &pushBlockPreFilterEnv);
+                        break;
+                    default:
+                        break;
+                }
+                vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descSet, 0, nullptr);
+
+                VkDeviceSize offsets[1] = {0};
+
+                mModels.mModelSkybox.Draw(cmdBuffer);
+
+                vkCmdEndRenderPass(cmdBuffer);
+
+                VkImageSubresourceRange subResRange { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+                subResRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                subResRange.baseMipLevel = 0;
+                subResRange.levelCount = numMips;
+                subResRange.layerCount = 6;
+                {
+                    VkImageMemoryBarrier imageMemBarrier = vks::initializers::imageMemoryBarrier();
+                    imageMemBarrier.image = offscreen.osImage;
+                    imageMemBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    imageMemBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    imageMemBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    imageMemBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+                    imageMemBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+                    vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemBarrier);
+                }
+                // Copy region for transfer from framebuffer to cube face
+                VkImageCopy copyRegion{};
+                copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                copyRegion.srcSubresource.baseArrayLayer = 0;
+                copyRegion.srcSubresource.mipLevel = 0;
+                copyRegion.srcSubresource.layerCount = 1;
+                copyRegion.srcOffset = {0, 0, 0};
+
+                copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                copyRegion.dstSubresource.baseArrayLayer = f;
+                copyRegion.dstSubresource.mipLevel = m;
+                copyRegion.dstSubresource.layerCount = 1;
+                copyRegion.dstOffset = {0, 0, 0};
+                copyRegion.extent.width = static_cast<uint32_t>(viewport.width);
+                copyRegion.extent.height = static_cast<uint32_t>(viewport.height);
+                copyRegion.extent.depth = 1;
+
+                vkCmdCopyImage(cmdBuffer, offscreen.osImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cubeMap.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+                {
+                    VkImageMemoryBarrier imageMemBarrier = vks::initializers::imageMemoryBarrier();
+                    imageMemBarrier.image = offscreen.osImage;
+                    imageMemBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    imageMemBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    imageMemBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+                    imageMemBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    imageMemBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+                    vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemBarrier);
+                }
+                vulkanDevice->flushCommandBuffer(cmdBuffer, queue, false);
+            }
+        }
+
+        {
+            vulkanDevice->beginCommandBuffer(cmdBuffer);
+            VkImageMemoryBarrier imageMemBarrier = vks::initializers::imageMemoryBarrier();
+            imageMemBarrier.image = cubeMap.image;
+            imageMemBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            imageMemBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageMemBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            imageMemBarrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+            imageMemBarrier.subresourceRange = subresourceRange;
+            vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemBarrier);
+            vulkanDevice->flushCommandBuffer(cmdBuffer, queue, false);
+        }
+
+        vkDestroyRenderPass(device, renderPass, nullptr);
+        vkDestroyFramebuffer(device, offscreen.osFrameBuffer, nullptr);
+        vkFreeMemory(device, offscreen.osImageMemory, nullptr);
+        vkDestroyImageView(device, offscreen.osImageView, nullptr);
+        vkDestroyImage(device, offscreen.osImage, nullptr);
+        vkDestroyDescriptorPool(device, descPool, nullptr);
+        vkDestroyDescriptorSetLayout(device, descSetLayout, nullptr);
+        vkDestroyPipeline(device, pipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
+        cubeMap.descriptor.imageView = cubeMap.view;
+        cubeMap.descriptor.sampler = cubeMap.sampler;
+        cubeMap.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        cubeMap.device = vulkanDevice;
+
+        switch (target) {
+            case IRRADIANCE:
+                mTextures.mTexIrradianceCube = cubeMap;
+                break;
+            case PREFILTEREDENV:
+                mTextures.mTexPreFilterCube = cubeMap;
+                mShaderParams.mParamPrefilteredCubeMipLevels = static_cast<float>(numMips);
+                break;
+            default:
+                break;
+        };
+
+        auto tEnd = std::chrono::high_resolution_clock::now();
+        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+        std::cout << "Generating cube map with " << numMips << " mip levels took " << tDiff << " ms" << std::endl;
     }
 }
 
 void PBRRenderer::PrepareUniformBuffers()
 {
-
+    for (auto & ub : mUniformBuffers)
+    {
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOScene, sizeof(mShaderValScene)))
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOSkybox, sizeof(mShaderValSkybox)))
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOParams, sizeof(mShaderParams)))
+    }
+    UpdateUniformBuffers();
 }
 
 void PBRRenderer::UpdateUniformBuffers()
 {
+    // Scene
+    mShaderValScene.mUBOProj = camera.matrices.perspective;
+    mShaderValScene.mUBOView = camera.matrices.view;
 
+    // Center and scale model
+    float scale = (1.0f / std::max(mModels.mModelScene.mAABB[0][0], std::max(mModels.mModelScene.mAABB[1][1], mModels.mModelScene.mAABB[2][2]))) * 0.5f;
+    glm::vec3 translate = -glm::vec3(mModels.mModelScene.mAABB[3][0], mModels.mModelScene.mAABB[3][1], mModels.mModelScene.mAABB[3][2]);
+    translate += -0.5f * glm::vec3(mModels.mModelScene.mAABB[0][0], mModels.mModelScene.mAABB[1][1], mModels.mModelScene.mAABB[2][2]);
+
+    mShaderValScene.mUBOModel = glm::mat4(1.0f);
+    mShaderValScene.mUBOModel[0][0] = scale;
+    mShaderValScene.mUBOModel[1][1] = scale;
+    mShaderValScene.mUBOModel[2][2] = scale;
+    mShaderValScene.mUBOModel = glm::translate(mShaderValScene.mUBOModel, translate);
+
+    mShaderValScene.mUBOCamPos = glm::vec3(
+        -camera.position.z * sin(glm::radians(camera.rotation.y)) * cos(glm::radians(camera.rotation.x)),
+        -camera.position.z * sin(glm::radians(camera.rotation.x)),
+        camera.position.z * cos(glm::radians(camera.rotation.y)) * cos(glm::radians(camera.rotation.x)));
+
+    // skybox
+    mShaderValSkybox.mUBOProj = camera.matrices.perspective;
+    mShaderValSkybox.mUBOView = camera.matrices.view;
+    mShaderValSkybox.mUBOModel = glm::mat4(glm::mat3(camera.matrices.view));
 }
 
 void PBRRenderer::UpdateParams()
 {
-
+    mShaderParams.mParamLightDir = glm::vec4(
+        sin(glm::radians(mLight.mRotation.x)) * cos(glm::radians(mLight.mRotation.y)),
+        sin(glm::radians(mLight.mRotation.y)),
+        cos(glm::radians(mLight.mRotation.x)) * cos(glm::radians(mLight.mRotation.y)),
+        0.0f);
 }
 
 void PBRRenderer::BuildCommandBuffers()
@@ -1133,11 +1342,118 @@ void PBRRenderer::BuildCommandBuffers()
 void PBRRenderer::Prepare()
 {
     VulkanFramework::Prepare();
+
+    camera.type = Camera::CameraType::lookat;
+    camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 256.0f);
+    camera.rotationSpeed = 0.25f;
+    camera.movementSpeed = 0.1f;
+    camera.setPosition({ 0.0f, 0.0f, 1.0f });
+    camera.setRotation({ 0.0f, 0.0f, 0.0f });
+
+    waitFences.resize(mRenderAhead);
+    mPresentCompleteSemaphore.resize(mRenderAhead);
+    mRenderCompleteSemaphore.resize(mRenderAhead);
+    mCmdBuffers.resize(swapChain.imageCount);
+    mUniformBuffers.resize(swapChain.imageCount);
+    mDescSets.resize(swapChain.imageCount);
+
+    // Command buffer execution fences
+    for (auto & fence : waitFences)
+    {
+        VkFenceCreateInfo fenceCI{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
+        VK_CHECK_RESULT(vkCreateFence(device, &fenceCI, nullptr, &fence))
+    }
+    for (auto & sem : mPresentCompleteSemaphore)
+    {
+        VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
+        VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCI, nullptr, &sem));
+    }
+    for (auto & sem : mRenderCompleteSemaphore)
+    {
+        VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
+        VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCI, nullptr, &sem));
+    }
+    // Command buffers
+    {
+        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(mCmdBuffers.size()));
+        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, mCmdBuffers.data()));
+    }
+
+    LoadAssets();
+    GenerateBRDFLUT();
+    GenerateBRDFLUT();
+    PrepareUniformBuffers();
+    SetDescriptors();
+    PreparePipelines();
+
+    BuildCommandBuffers();
+
+    prepared = true;
 }
 
 void PBRRenderer::Render()
 {
+    RenderFrame();
+    if (camera.updated) UpdateUniformBuffers();
 
+    VK_CHECK_RESULT(vkWaitForFences(device, 1, &waitFences[mFrameIndex], VK_TRUE, UINT64_MAX));
+    VK_CHECK_RESULT(vkResetFences(device, 1, &waitFences[mFrameIndex]));
+
+    VkResult aquired = swapChain.acquireNextImage(mPresentCompleteSemaphore[mFrameIndex], &currentBuffer);
+    if (aquired == VK_ERROR_OUT_OF_DATE_KHR || aquired == VK_SUBOPTIMAL_KHR) WindowResized();
+    else VK_CHECK_RESULT(aquired);
+
+    UpdateUniformBuffers();
+    UniformBufferSet currentUB = mUniformBuffers[currentBuffer];
+    memcpy(currentUB.mUBOScene.mapped, &mShaderValScene, sizeof(mShaderValScene));
+    memcpy(currentUB.mUBOParams.mapped, &mShaderParams, sizeof(mShaderParams));
+    memcpy(currentUB.mUBOSkybox.mapped, &mShaderValSkybox, sizeof(mShaderValSkybox));
+
+    const VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submitInfo = vks::initializers::submitInfo();
+    submitInfo.pWaitDstStageMask = &waitDstStageMask;
+    submitInfo.pWaitSemaphores = &mPresentCompleteSemaphore[mFrameIndex];
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &mRenderCompleteSemaphore[mFrameIndex];
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pCommandBuffers = &mCmdBuffers[currentBuffer];
+    submitInfo.commandBufferCount = 1;
+    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[mFrameIndex]));
+
+    VkResult present = swapChain.queuePresent(queue, currentBuffer, mRenderCompleteSemaphore[mFrameIndex]);
+    if (!((present == VK_SUCCESS) || (present == VK_SUBOPTIMAL_KHR)))
+    {
+        if (present == VK_ERROR_OUT_OF_DATE_KHR) {
+            WindowResized();
+            return;
+        }
+        else {
+            VK_CHECK_RESULT(present);
+        }
+    }
+
+    mFrameIndex += 1;
+    mFrameIndex %= mRenderAhead;
+
+    if (!paused) {
+        if (mRotateModel) {
+            mModelRotation.y += frameTimer * 35.0f;
+            if (mModelRotation.y > 360.0f) {
+                mModelRotation.y -= 360.0f;
+            }
+        }
+        if ((mbAnimate) && (!mModels.mModelScene.mAnimations.empty())) {
+            mAnimationTimer += frameTimer;
+            if (mAnimationTimer > mModels.mModelScene.mAnimations[mAnimationIndex].mEnd) {
+                mAnimationTimer -= mModels.mModelScene.mAnimations[mAnimationIndex].mEnd;
+            }
+            mModels.mModelScene.UpdateAnimation(mAnimationIndex, mAnimationTimer);
+        }
+        UpdateParams();
+        if (mRotateModel) {
+            UpdateUniformBuffers();
+        }
+    }
 }
 
 void PBRRenderer::ViewChanged()
@@ -1147,15 +1463,57 @@ void PBRRenderer::ViewChanged()
 
 void PBRRenderer::WindowResized()
 {
-    VulkanFramework::WindowResized();
+    BuildCommandBuffers();
+    vkDeviceWaitIdle(device);
+    UpdateUniformBuffers();
 }
 
 void PBRRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {
-    VulkanFramework::OnUpdateUIOverlay(overlay);
+    bool updateShaderParams = false;
+    bool updateCBs = false;
+    float scale = 1.0f;
+
+    if (UIOverlay.header("Scene"))
+    {
+        if (UIOverlay.button("Open GLTF File"))
+        {
+            std::string filename;
+            char buffer[MAX_PATH];
+            OPENFILENAME ofn;
+            ZeroMemory(&buffer, sizeof(buffer));
+            ZeroMemory(&ofn, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.lpstrFilter = "GLTF Files\0*.gltf;*.glb\0";
+            ofn.lpstrFile = buffer;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.lpstrTitle = "Select a glTF file to load";
+            ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+            if (GetOpenFileNameA(&ofn))
+            {
+                filename = buffer;
+            }
+            if (!filename.empty())
+            {
+                vkDeviceWaitIdle(device);
+                LoadScene(filename);
+                SetDescriptors();
+                updateCBs = true;
+            }
+        }
+        if (UIOverlay.comboBox("Environment", mSelectedEnvironment, mEnvironments)) {
+            vkDeviceWaitIdle(device);
+            loadEnvironment(environments[selectedEnvironment]);
+            setupDescriptors();
+            updateCBs = true;
+        }
+    }
 }
 
 void PBRRenderer::FileDropped(std::string &filename)
 {
-    VulkanFramework::FileDropped(filename);
+    vkDeviceWaitIdle(device);
+    LoadScene(filename);
+    SetDescriptors();
+    BuildCommandBuffers();
 }

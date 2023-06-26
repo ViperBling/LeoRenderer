@@ -8,6 +8,8 @@
 */
 
 #include "VulkanUIOverlay.h"
+#include <iostream>
+#include <map>
 
 namespace vks 
 {
@@ -476,6 +478,11 @@ namespace vks
 		bool res = ImGui::SliderInt(caption, value, min, max);
 		if (res) { updated = true; };
 		return res;
+	}
+
+	bool UIOverlay::combo(const char *caption, std::string &selectedKey, std::map<std::string, std::string> items)
+	{
+		return false;
 	}
 
 	bool UIOverlay::comboBox(const char *caption, int32_t *itemindex, std::vector<std::string> items)
