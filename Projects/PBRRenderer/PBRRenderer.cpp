@@ -171,7 +171,7 @@ void PBRRenderer::LoadAssets()
         }
     }
     LoadScene(sceneFile);
-    std::string skyBox = assetPath + "Models/Box/glTF-Embedded/Box.gltf";
+    std::string skyBox = assetPath + "Models/Box.gltf";
     mModels.mModelSkybox.LoadFromFile(skyBox, vulkanDevice, queue);
 
     LoadEnvironment(envMapsFile);
@@ -467,8 +467,8 @@ void PBRRenderer::PreparePipelines()
     pipelineCI.pStages = shaderStages.data();
 
     shaderStages = {
-        LoadShader("skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-        LoadShader("skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        LoadShader("SkyBox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader("SkyBox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelineSkyBox));
     for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
