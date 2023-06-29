@@ -231,12 +231,12 @@ namespace LeoRenderer
 
     struct Vertices
     {
-        VkBuffer mVBuffer;
+        VkBuffer mVBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mVMemory;
     };
     struct Indices
     {
-        VkBuffer mIBuffer;
+        VkBuffer mIBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mIMemory;
     };
 
