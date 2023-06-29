@@ -16,6 +16,9 @@ PBRRenderer::~PBRRenderer()
     vkDestroyDescriptorSetLayout(device, mDescSetLayouts.mDescLayoutMaterial, nullptr);
     vkDestroyDescriptorSetLayout(device, mDescSetLayouts.mDescLayoutNode, nullptr);
 
+    mModels.mModelScene.OnDestroy();
+    mModels.mModelSkybox.OnDestroy();
+
     for (auto buffer : mUniformBuffers)
     {
         buffer.mUBOParams.destroy();
