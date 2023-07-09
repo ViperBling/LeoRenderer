@@ -1384,7 +1384,7 @@ void PBRRenderer::Prepare()
 
     LoadAssets();
     GenerateBRDFLUT();
-    GenerateBRDFLUT();
+    GenerateCubeMaps();
     PrepareUniformBuffers();
     SetDescriptors();
     PreparePipelines();
