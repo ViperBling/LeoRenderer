@@ -34,7 +34,7 @@ vec4 ToneMap(vec4 color)
 
 #define MANUAL_SRGB 1
 
-vec4 SRGBToLinear(vec4 srgb)
+vec4 SRGBToLinear(vec4 srgbIn)
 {
 #ifdef MANUAL_SRGB
 #ifdef SRGB_FAST_APPROXIMATION

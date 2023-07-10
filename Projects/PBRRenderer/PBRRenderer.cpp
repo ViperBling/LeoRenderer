@@ -470,15 +470,15 @@ void PBRRenderer::PreparePipelines()
     pipelineCI.pStages = shaderStages.data();
 
     shaderStages = {
-        LoadShader("SkyBox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-        LoadShader("SkyBox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/SkyBox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/SkyBox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelineSkyBox));
     for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 
     shaderStages = {
-        LoadShader("PBR.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-        LoadShader("PBR_KHR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/PBR.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/PBR_KHR.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
     dsStateCI.depthWriteEnable = VK_TRUE;
     dsStateCI.depthTestEnable = VK_TRUE;
@@ -647,8 +647,8 @@ void PBRRenderer::GenerateBRDFLUT()
     VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo();
 
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{
-        LoadShader("GenerateBRDFLUT.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-        LoadShader("GenerateBRDFLUT.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/GenerateBRDFLUT.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+        LoadShader(getAssetPath() + "Shaders/GLSL/PBR/GenerateBRDFLUT.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
 
     VkGraphicsPipelineCreateInfo gfxPipelineCI{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
@@ -1033,14 +1033,14 @@ void PBRRenderer::GenerateCubeMaps()
         gfxPipelineCI.pStages = shaderStages.data();
         gfxPipelineCI.renderPass = renderPass;
 
-        shaderStages[0] = LoadShader("FilterCube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+        shaderStages[0] = LoadShader(getAssetPath() + "Shaders/GLSL/PBR/FilterCube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         switch (target)
         {
             case IRRADIANCE:
-                shaderStages[1] = LoadShader("IrradianceCube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+                shaderStages[1] = LoadShader(getAssetPath() + "Shaders/GLSL/PBR/IrradianceCube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
                 break;
             case PREFILTEREDENV:
-                shaderStages[1] = LoadShader("PrefilterEnvMap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+                shaderStages[1] = LoadShader(getAssetPath() + "Shaders/GLSL/PBR/PrefilterEnvMap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
                 break;
             default:
                 break;
