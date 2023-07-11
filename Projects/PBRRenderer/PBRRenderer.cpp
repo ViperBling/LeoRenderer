@@ -445,9 +445,9 @@ void PBRRenderer::PreparePipelines()
         vks::initializers::vertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoRenderer::Vertex, mUV0)),
         vks::initializers::vertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoRenderer::Vertex, mUV1)),
         vks::initializers::vertexInputAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mColor)),
-        vks::initializers::vertexInputAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mJoint0)),
-        vks::initializers::vertexInputAttributeDescription(0, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mWeight0)),
-        vks::initializers::vertexInputAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mTangent)),
+        vks::initializers::vertexInputAttributeDescription(0, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mJoint0)),
+        vks::initializers::vertexInputAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mWeight0)),
+        // vks::initializers::vertexInputAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoRenderer::Vertex, mTangent)),
     };
     VkPipelineVertexInputStateCreateInfo viStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(viBindings, viAttributes);
 
@@ -532,6 +532,7 @@ void PBRRenderer::GenerateBRDFLUT()
     imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
     imageViewCI.format = format;
     imageViewCI.subresourceRange = {};
+    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imageViewCI.subresourceRange.levelCount = 1;
     imageViewCI.subresourceRange.layerCount = 1;
     imageViewCI.image = mTextures.mTexLUTBRDF.image;

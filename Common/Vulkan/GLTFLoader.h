@@ -139,7 +139,8 @@ namespace LeoRenderer
             void*                   mapped;
         } mUniformBuffer;
 
-        struct UniformBlock {
+        struct UniformBlock
+        {
             glm::mat4 matrix;
             glm::mat4 jointMatrix[64]{};
             float jointCount{};

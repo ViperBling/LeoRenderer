@@ -6,9 +6,6 @@
 layout (location = 0) in vec2 inUV;
 layout (location = 0) out vec4 outColor;
 
-
-
-
 // Based omn http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
 // float Random(vec2 co)
 // {
