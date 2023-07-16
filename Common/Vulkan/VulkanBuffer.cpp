@@ -11,7 +11,22 @@
 #include "VulkanBuffer.h"
 
 namespace vks
-{	
+{
+    void Buffer::create(
+        VulkanDevice *vksDevice,
+        VkBufferUsageFlags usageFlag,
+        VkMemoryPropertyFlags memPropertyFlag,
+        VkDeviceSize vkSize, bool map)
+    {
+        this->device = vksDevice->logicalDevice;
+        vksDevice->createBuffer(usageFlag, memPropertyFlag, vkSize, &buffer, &memory);
+        descriptor = {buffer, 0, vkSize};
+        if (map)
+        {
+            VK_CHECK_RESULT(vkMapMemory(vksDevice->logicalDevice, memory, 0, vkSize, 0, &mapped))
+        }
+    }
+
 	/** 
 	* Map a memory range of this buffer. If successful, mapped points to the specified buffer range.
 	* 

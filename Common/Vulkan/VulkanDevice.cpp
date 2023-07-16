@@ -416,9 +416,10 @@ namespace vks
 			VK_CHECK_RESULT(buffer->map());
 			memcpy(buffer->mapped, data, size);
 			if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
-				buffer->flush();
-
-//			buffer->unmap();
+            {
+                buffer->flush();
+            }
+			 buffer->unmap();
 		}
 
 		// Initialize a default descriptor that covers the whole buffer size
