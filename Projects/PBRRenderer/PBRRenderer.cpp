@@ -62,7 +62,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                 }
                 if (pipeline != mBoundPipeline)
                 {
-                    vkCmdBindPipeline(drawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                    vkCmdBindPipeline(mCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                     mBoundPipeline = pipeline;
                 }
 
@@ -73,7 +73,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                         node->mMesh->mUniformBuffer.descriptorSet,
                     };
                 vkCmdBindDescriptorSets(
-                    drawCmdBuffers[cbIndex],
+                    mCmdBuffers[cbIndex],
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     mPipelineLayout, 0,
                     static_cast<uint32_t>(descSets.size()),
@@ -110,15 +110,15 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                     pushConstantBlockMat.mFactorSpecular = glm::vec4(primitive->mMaterial.mExtension.mSpecularFactor, 1.0f);
                 }
 
-                vkCmdPushConstants(drawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
+                vkCmdPushConstants(mCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
 
                 if (primitive->mbHasIndex)
                 {
-                    vkCmdDrawIndexed(drawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                    vkCmdDrawIndexed(mCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
                 }
                 else
                 {
-                    vkCmdDraw(drawCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
+                    vkCmdDraw(mCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
                 }
             }
         }
@@ -1073,7 +1073,7 @@ void PBRRenderer::GenerateCubeMaps()
             glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
         };
 
-        VkCommandBuffer cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+        VkCommandBuffer cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
 
         VkViewport viewport{};
         viewport.width = (float)dim;
@@ -1307,11 +1307,11 @@ void PBRRenderer::BuildCommandBuffers()
     renderPassBI.clearValueCount = settings.multiSampling ? 3 : 2;
     renderPassBI.pClearValues = clearValues;
 
-    for (uint32_t i = 0; i < drawCmdBuffers.size(); i++)
+    for (uint32_t i = 0; i < mCmdBuffers.size(); i++)
     {
         renderPassBI.framebuffer = frameBuffers[i];
 
-        VkCommandBuffer currentCmdBuffer = drawCmdBuffers[i];
+        VkCommandBuffer currentCmdBuffer = mCmdBuffers[i];
 
         VK_CHECK_RESULT(vkBeginCommandBuffer(currentCmdBuffer, &cmdBufferBI))
         vkCmdBeginRenderPass(currentCmdBuffer, &renderPassBI, VK_SUBPASS_CONTENTS_INLINE);
@@ -1361,7 +1361,7 @@ void PBRRenderer::Prepare()
     waitFences.resize(mRenderAhead);
     mPresentCompleteSemaphore.resize(mRenderAhead);
     mRenderCompleteSemaphore.resize(mRenderAhead);
-    drawCmdBuffers.resize(swapChain.imageCount);
+    mCmdBuffers.resize(swapChain.imageCount);
     mUniformBuffers.resize(swapChain.imageCount);
     mDescSets.resize(swapChain.imageCount);
 
@@ -1383,8 +1383,8 @@ void PBRRenderer::Prepare()
     }
     // Command buffers
     {
-        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, drawCmdBuffers.data()));
+        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(mCmdBuffers.size()));
+        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, mCmdBuffers.data()));
     }
 
     LoadAssets();
@@ -1424,7 +1424,7 @@ void PBRRenderer::Render()
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &mRenderCompleteSemaphore[mFrameIndex];
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
+    submitInfo.pCommandBuffers = &mCmdBuffers[currentBuffer];
     submitInfo.commandBufferCount = 1;
     VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[mFrameIndex]));
 

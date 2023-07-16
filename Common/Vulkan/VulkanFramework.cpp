@@ -348,7 +348,7 @@ void VulkanFramework::nextFrame()
 	tPrevEnd = tEnd;
 	
 	// TODO: Cap UI overlay update rates
-	updateOverlay();
+//	updateOverlay();
 }
 
 void VulkanFramework::RenderLoop()
@@ -1413,6 +1413,23 @@ void VulkanFramework::HandleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 	case WM_EXITSIZEMOVE:
 		resizing = false;
 		break;
+    case WM_DROPFILES:
+    {
+        std::string fname;
+        HDROP hDrop = reinterpret_cast<HDROP>(wParam);
+        // extract files here
+        char filename[MAX_PATH];
+        uint32_t count = DragQueryFileA(hDrop, -1, nullptr, 0);
+        for (uint32_t i = 0; i < count; ++i) {
+            if (DragQueryFileA(hDrop, i, filename, MAX_PATH)) {
+                fname = filename;
+            }
+            break;
+        }
+        DragFinish(hDrop);
+        FileDropped(fname);
+        break;
+    }
 	}
 
 	OnHandleMessage(hWnd, uMsg, wParam, lParam);
