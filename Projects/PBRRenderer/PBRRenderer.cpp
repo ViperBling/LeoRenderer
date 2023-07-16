@@ -47,76 +47,79 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
     {
         for (LeoRenderer::Primitive* primitive : node->mMesh->mPrimitives)
         {
-            VkPipeline pipeline = VK_NULL_HANDLE;
-            switch (alphaMode)
+            if (primitive->mMaterial.mAlphaMode == alphaMode)
             {
-                case LeoRenderer::Material::ALPHA_MODE_OPAQUE:
-                case LeoRenderer::Material::ALPHA_MODE_MASK:
-                    pipeline = primitive->mMaterial.m_bDoubleSided ? mPipelines.mPipelineDoubleSided : mPipelines.mPipelinePBR;
-                    break;
-                case LeoRenderer::Material::ALPHA_MODE_BLEND:
-                    pipeline = mPipelines.mPipelinePBRAlphaBlend;
-                    break;
-            }
-            if (pipeline != VK_NULL_HANDLE)
-            {
-                vkCmdBindPipeline(drawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-                mBoundPipeline = pipeline;
-            }
+                VkPipeline pipeline = VK_NULL_HANDLE;
+                switch (alphaMode)
+                {
+                    case LeoRenderer::Material::ALPHA_MODE_OPAQUE:
+                    case LeoRenderer::Material::ALPHA_MODE_MASK:
+                        pipeline = primitive->mMaterial.m_bDoubleSided ? mPipelines.mPipelineDoubleSided : mPipelines.mPipelinePBR;
+                        break;
+                    case LeoRenderer::Material::ALPHA_MODE_BLEND:
+                        pipeline = mPipelines.mPipelinePBRAlphaBlend;
+                        break;
+                }
+                if (pipeline != mBoundPipeline)
+                {
+                    vkCmdBindPipeline(drawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                    mBoundPipeline = pipeline;
+                }
 
-            const std::vector<VkDescriptorSet> descSets =
-            {
-                mDescSets[cbIndex].mDescScene,
-                primitive->mMaterial.mDescriptorSet,
-                node->mMesh->mUniformBuffer.descriptorSet,
-            };
-            vkCmdBindDescriptorSets(
-                drawCmdBuffers[cbIndex],
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                mPipelineLayout, 0,
-                static_cast<uint32_t>(descSets.size()),
-                descSets.data(), 0,
-                nullptr);
+                const std::vector<VkDescriptorSet> descSets =
+                    {
+                        mDescSets[cbIndex].mDescScene,
+                        primitive->mMaterial.mDescriptorSet,
+                        node->mMesh->mUniformBuffer.descriptorSet,
+                    };
+                vkCmdBindDescriptorSets(
+                    drawCmdBuffers[cbIndex],
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    mPipelineLayout, 0,
+                    static_cast<uint32_t>(descSets.size()),
+                    descSets.data(), 0,
+                    nullptr);
 
-            // Push constant
-            PushConstantBlockMaterial pushConstantBlockMat{};
-            pushConstantBlockMat.mFactorEmissive = primitive->mMaterial.mEmissiveFactor;
-            // 读取对应texture的index
-            pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mBaseColorTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mBaseColor : -1;
-            pushConstantBlockMat.mTextureSetNormal = primitive->mMaterial.mNormalTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mNormal : -1;
-            pushConstantBlockMat.mTextureSetOcclusion = primitive->mMaterial.mOcclusionTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mOcclusion : -1;
-            pushConstantBlockMat.mTextureSetEmissive = primitive->mMaterial.mEmissiveTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mEmissive : -1;
-            pushConstantBlockMat.mFactorAlphaMask = static_cast<float>(primitive->mMaterial.mAlphaMode == LeoRenderer::Material::ALPHA_MODE_MASK);
-            pushConstantBlockMat.mFactorAlphaMaskCutoff = primitive->mMaterial.mAlphaCutoff;
-
-            if (primitive->mMaterial.mPBRWorkFlows.mbMetallicRoughness)
-            {
-                pushConstantBlockMat.mWorkFlow = static_cast<float>(PBR_WORKFLOW_METALLIC_ROUGHNESS);
-                pushConstantBlockMat.mFactorBaseColor = primitive->mMaterial.mBaseColorFactor;
-                pushConstantBlockMat.mFactorMetallic = primitive->mMaterial.mMetallicFactor;
-                pushConstantBlockMat.mFactorRoughness = primitive->mMaterial.mRoughnessFactor;
-                pushConstantBlockMat.mTextureSetPhysicalDescriptor = primitive->mMaterial.mMetallicRoughnessTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mMetallicRoughness : -1;
+                // Push constant
+                PushConstantBlockMaterial pushConstantBlockMat{};
+                pushConstantBlockMat.mFactorEmissive = primitive->mMaterial.mEmissiveFactor;
+                // 读取对应texture的index
                 pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mBaseColorTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mBaseColor : -1;
-            }
+                pushConstantBlockMat.mTextureSetNormal = primitive->mMaterial.mNormalTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mNormal : -1;
+                pushConstantBlockMat.mTextureSetOcclusion = primitive->mMaterial.mOcclusionTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mOcclusion : -1;
+                pushConstantBlockMat.mTextureSetEmissive = primitive->mMaterial.mEmissiveTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mEmissive : -1;
+                pushConstantBlockMat.mFactorAlphaMask = static_cast<float>(primitive->mMaterial.mAlphaMode == LeoRenderer::Material::ALPHA_MODE_MASK);
+                pushConstantBlockMat.mFactorAlphaMaskCutoff = primitive->mMaterial.mAlphaCutoff;
 
-            if (primitive->mMaterial.mPBRWorkFlows.mbSpecularGlossiness)
-            {
-                pushConstantBlockMat.mWorkFlow = static_cast<float>(PBR_WORKFLOW_SPECULAR_GLOSINESS);
-                pushConstantBlockMat.mTextureSetPhysicalDescriptor = primitive->mMaterial.mExtension.mSpecularGlossinessTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mSpecularGlossiness : -1;
-                pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mExtension.mDiffuseTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mBaseColor : -1;
-                pushConstantBlockMat.mFactorDiffuse = primitive->mMaterial.mExtension.mDiffuseFactor;
-                pushConstantBlockMat.mFactorSpecular = glm::vec4(primitive->mMaterial.mExtension.mSpecularFactor, 1.0f);
-            }
+                if (primitive->mMaterial.mPBRWorkFlows.mbMetallicRoughness)
+                {
+                    pushConstantBlockMat.mWorkFlow = static_cast<float>(PBR_WORKFLOW_METALLIC_ROUGHNESS);
+                    pushConstantBlockMat.mFactorBaseColor = primitive->mMaterial.mBaseColorFactor;
+                    pushConstantBlockMat.mFactorMetallic = primitive->mMaterial.mMetallicFactor;
+                    pushConstantBlockMat.mFactorRoughness = primitive->mMaterial.mRoughnessFactor;
+                    pushConstantBlockMat.mTextureSetPhysicalDescriptor = primitive->mMaterial.mMetallicRoughnessTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mMetallicRoughness : -1;
+                    pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mBaseColorTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mBaseColor : -1;
+                }
 
-            vkCmdPushConstants(mCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
+                if (primitive->mMaterial.mPBRWorkFlows.mbSpecularGlossiness)
+                {
+                    pushConstantBlockMat.mWorkFlow = static_cast<float>(PBR_WORKFLOW_SPECULAR_GLOSINESS);
+                    pushConstantBlockMat.mTextureSetPhysicalDescriptor = primitive->mMaterial.mExtension.mSpecularGlossinessTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mSpecularGlossiness : -1;
+                    pushConstantBlockMat.mTextureSetColor = primitive->mMaterial.mExtension.mDiffuseTexture != nullptr ? primitive->mMaterial.mTexCoordSet.mBaseColor : -1;
+                    pushConstantBlockMat.mFactorDiffuse = primitive->mMaterial.mExtension.mDiffuseFactor;
+                    pushConstantBlockMat.mFactorSpecular = glm::vec4(primitive->mMaterial.mExtension.mSpecularFactor, 1.0f);
+                }
 
-            if (primitive->mbHasIndex)
-            {
-                vkCmdDrawIndexed(mCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
-            }
-            else
-            {
-                vkCmdDraw(mCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
+                vkCmdPushConstants(drawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
+
+                if (primitive->mbHasIndex)
+                {
+                    vkCmdDrawIndexed(drawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                }
+                else
+                {
+                    vkCmdDraw(drawCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
+                }
             }
         }
     }
@@ -417,7 +420,7 @@ void PBRRenderer::PreparePipelines()
         settings.multiSampling ?  settings.sampleCount : VK_SAMPLE_COUNT_1_BIT, 0);
     const std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dyStateCI = vks::initializers::pipelineDynamicStateCreateInfo(
-        dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()), 0);
+        dynamicStates.data(), static_cast<uint32_t>(dynamicStates.size()));
 
     const std::vector<VkDescriptorSetLayout> descSetLayouts =
     {
@@ -426,7 +429,7 @@ void PBRRenderer::PreparePipelines()
         mDescSetLayouts.mDescLayoutNode
     };
     VkPushConstantRange pushConstRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(PushConstantBlockMaterial), 0);
-    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data());
+    VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(descSetLayouts.data(), descSetLayouts.size());
     pipelineLayoutCI.pushConstantRangeCount = 1;
     pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &mPipelineLayout));
@@ -1236,9 +1239,9 @@ void PBRRenderer::PrepareUniformBuffers()
 {
     for (auto & ub : mUniformBuffers)
     {
-        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOScene, sizeof(mShaderValScene)))
-        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOSkybox, sizeof(mShaderValSkybox)))
-        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOParams, sizeof(mShaderParams)))
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOScene, sizeof(mShaderValScene), &ub.mUBOScene.mapped))
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOSkybox, sizeof(mShaderValSkybox), ub.mUBOSkybox.mapped))
+        VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &ub.mUBOParams, sizeof(mShaderParams), ub.mUBOParams.mapped))
     }
     UpdateUniformBuffers();
 }
@@ -1304,11 +1307,11 @@ void PBRRenderer::BuildCommandBuffers()
     renderPassBI.clearValueCount = settings.multiSampling ? 3 : 2;
     renderPassBI.pClearValues = clearValues;
 
-    for (uint32_t i = 0; i < mCmdBuffers.size(); i++)
+    for (uint32_t i = 0; i < drawCmdBuffers.size(); i++)
     {
         renderPassBI.framebuffer = frameBuffers[i];
 
-        VkCommandBuffer currentCmdBuffer = mCmdBuffers[i];
+        VkCommandBuffer currentCmdBuffer = drawCmdBuffers[i];
 
         VK_CHECK_RESULT(vkBeginCommandBuffer(currentCmdBuffer, &cmdBufferBI))
         vkCmdBeginRenderPass(currentCmdBuffer, &renderPassBI, VK_SUBPASS_CONTENTS_INLINE);
@@ -1339,6 +1342,7 @@ void PBRRenderer::BuildCommandBuffers()
         for (auto node : model.mNodes) RenderNode(node, i, LeoRenderer::Material::ALPHA_MODE_BLEND);
 
         DrawUI(currentCmdBuffer);
+        vkCmdEndRenderPass(currentCmdBuffer);
         VK_CHECK_RESULT(vkEndCommandBuffer(currentCmdBuffer));
     }
 }
@@ -1357,7 +1361,7 @@ void PBRRenderer::Prepare()
     waitFences.resize(mRenderAhead);
     mPresentCompleteSemaphore.resize(mRenderAhead);
     mRenderCompleteSemaphore.resize(mRenderAhead);
-    mCmdBuffers.resize(swapChain.imageCount);
+    drawCmdBuffers.resize(swapChain.imageCount);
     mUniformBuffers.resize(swapChain.imageCount);
     mDescSets.resize(swapChain.imageCount);
 
@@ -1379,8 +1383,8 @@ void PBRRenderer::Prepare()
     }
     // Command buffers
     {
-        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(mCmdBuffers.size()));
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, mCmdBuffers.data()));
+        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
+        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, drawCmdBuffers.data()));
     }
 
     LoadAssets();
@@ -1397,7 +1401,7 @@ void PBRRenderer::Prepare()
 
 void PBRRenderer::Render()
 {
-    RenderFrame();
+    if (!prepared) return;
     if (camera.updated) UpdateUniformBuffers();
 
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &waitFences[mFrameIndex], VK_TRUE, UINT64_MAX));
@@ -1420,7 +1424,7 @@ void PBRRenderer::Render()
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &mRenderCompleteSemaphore[mFrameIndex];
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pCommandBuffers = &mCmdBuffers[currentBuffer];
+    submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
     submitInfo.commandBufferCount = 1;
     VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[mFrameIndex]));
 
