@@ -3,6 +3,13 @@
 PBRRenderer::PBRRenderer() : VulkanFramework(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     title = "PBRRenderer";
+
+    camera.type = Camera::CameraType::lookat;
+    camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 256.0f);
+    camera.rotationSpeed = 0.25f;
+    camera.movementSpeed = 0.1f;
+    camera.setPosition({ 0.0f, 0.0f, 1.0f });
+    camera.setRotation({ 0.0f, 0.0f, 0.0f });
 }
 
 PBRRenderer::~PBRRenderer()
@@ -25,7 +32,7 @@ PBRRenderer::~PBRRenderer()
         buffer.mUBOScene.destroy();
         buffer.mUBOSkybox.destroy();
     }
-    for (auto fence : waitFences) vkDestroyFence(device, fence, nullptr);
+    // for (auto fence : waitFences) vkDestroyFence(device, fence, nullptr);
     for (auto sem : mRenderCompleteSemaphore) vkDestroySemaphore(device, sem, nullptr);
     for (auto sem : mPresentCompleteSemaphore) vkDestroySemaphore(device, sem, nullptr);
 
@@ -62,7 +69,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                 }
                 if (pipeline != mBoundPipeline)
                 {
-                    vkCmdBindPipeline(mCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                    vkCmdBindPipeline(drawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                     mBoundPipeline = pipeline;
                 }
 
@@ -73,7 +80,7 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                         node->mMesh->mUniformBuffer.descriptorSet,
                     };
                 vkCmdBindDescriptorSets(
-                    mCmdBuffers[cbIndex],
+                    drawCmdBuffers[cbIndex],
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     mPipelineLayout, 0,
                     static_cast<uint32_t>(descSets.size()),
@@ -110,15 +117,15 @@ void PBRRenderer::RenderNode(LeoRenderer::Node *node, uint32_t cbIndex, LeoRende
                     pushConstantBlockMat.mFactorSpecular = glm::vec4(primitive->mMaterial.mExtension.mSpecularFactor, 1.0f);
                 }
 
-                vkCmdPushConstants(mCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
+                vkCmdPushConstants(drawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantBlockMaterial), &pushConstantBlockMat);
 
                 if (primitive->mbHasIndex)
                 {
-                    vkCmdDrawIndexed(mCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                    vkCmdDrawIndexed(drawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
                 }
                 else
                 {
-                    vkCmdDraw(mCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
+                    vkCmdDraw(drawCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
                 }
             }
         }
@@ -477,7 +484,7 @@ void PBRRenderer::PreparePipelines()
         LoadShader(getAssetPath() + "Shaders/GLSL/PBR/SkyBox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
     };
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelineSkyBox));
-    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+//    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 
     shaderStages = {
         LoadShader(getAssetPath() + "Shaders/GLSL/PBR/PBR.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
@@ -500,7 +507,7 @@ void PBRRenderer::PreparePipelines()
     cbAttachState.alphaBlendOp = VK_BLEND_OP_ADD;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &mPipelines.mPipelinePBRAlphaBlend));
 
-    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+//    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 }
 
 void PBRRenderer::GenerateBRDFLUT()
@@ -671,7 +678,7 @@ void PBRRenderer::GenerateBRDFLUT()
 
     VkPipeline pipeline;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &gfxPipelineCI, nullptr, &pipeline))
-    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+//    for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 
     // Render LUT
     VkClearValue clearValue[1];
@@ -1051,7 +1058,7 @@ void PBRRenderer::GenerateCubeMaps()
         }
         VkPipeline pipeline;
         VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &gfxPipelineCI, nullptr, &pipeline))
-        for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
+//        for (auto ss : shaderStages) vkDestroyShaderModule(device, ss.module, nullptr);
 
         // Render Cubemap
         VkClearValue clearValue[1];
@@ -1307,11 +1314,11 @@ void PBRRenderer::BuildCommandBuffers()
     renderPassBI.clearValueCount = settings.multiSampling ? 3 : 2;
     renderPassBI.pClearValues = clearValues;
 
-    for (uint32_t i = 0; i < mCmdBuffers.size(); i++)
+    for (uint32_t i = 0; i < drawCmdBuffers.size(); i++)
     {
         renderPassBI.framebuffer = frameBuffers[i];
 
-        VkCommandBuffer currentCmdBuffer = mCmdBuffers[i];
+        VkCommandBuffer currentCmdBuffer = drawCmdBuffers[i];
 
         VK_CHECK_RESULT(vkBeginCommandBuffer(currentCmdBuffer, &cmdBufferBI))
         vkCmdBeginRenderPass(currentCmdBuffer, &renderPassBI, VK_SUBPASS_CONTENTS_INLINE);
@@ -1351,17 +1358,10 @@ void PBRRenderer::Prepare()
 {
     VulkanFramework::Prepare();
 
-    camera.type = Camera::CameraType::lookat;
-    camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 256.0f);
-    camera.rotationSpeed = 0.25f;
-    camera.movementSpeed = 0.1f;
-    camera.setPosition({ 0.0f, 0.0f, 1.0f });
-    camera.setRotation({ 0.0f, 0.0f, 0.0f });
-
     waitFences.resize(mRenderAhead);
     mPresentCompleteSemaphore.resize(mRenderAhead);
     mRenderCompleteSemaphore.resize(mRenderAhead);
-    mCmdBuffers.resize(swapChain.imageCount);
+    drawCmdBuffers.resize(swapChain.imageCount);
     mUniformBuffers.resize(swapChain.imageCount);
     mDescSets.resize(swapChain.imageCount);
 
@@ -1383,8 +1383,8 @@ void PBRRenderer::Prepare()
     }
     // Command buffers
     {
-        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(mCmdBuffers.size()));
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, mCmdBuffers.data()));
+        VkCommandBufferAllocateInfo cmdBufferAI = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
+        VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufferAI, drawCmdBuffers.data()));
     }
 
     LoadAssets();
@@ -1402,43 +1402,44 @@ void PBRRenderer::Prepare()
 void PBRRenderer::Render()
 {
     if (!prepared) return;
+    VulkanFramework::RenderFrame();
     if (camera.updated) UpdateUniformBuffers();
 
-    VK_CHECK_RESULT(vkWaitForFences(device, 1, &waitFences[mFrameIndex], VK_TRUE, UINT64_MAX));
-    VK_CHECK_RESULT(vkResetFences(device, 1, &waitFences[mFrameIndex]));
-
-    VkResult aquired = swapChain.acquireNextImage(mPresentCompleteSemaphore[mFrameIndex], &currentBuffer);
-    if (aquired == VK_ERROR_OUT_OF_DATE_KHR || aquired == VK_SUBOPTIMAL_KHR) WindowResized();
-    else VK_CHECK_RESULT(aquired);
-
-    UpdateUniformBuffers();
-    UniformBufferSet currentUB = mUniformBuffers[currentBuffer];
-    memcpy(currentUB.mUBOScene.mapped, &mShaderValScene, sizeof(mShaderValScene));
-    memcpy(currentUB.mUBOParams.mapped, &mShaderParams, sizeof(mShaderParams));
-    memcpy(currentUB.mUBOSkybox.mapped, &mShaderValSkybox, sizeof(mShaderValSkybox));
-
-    const VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submitInfo = vks::initializers::submitInfo();
-    submitInfo.pWaitDstStageMask = &waitDstStageMask;
-    submitInfo.pWaitSemaphores = &mPresentCompleteSemaphore[mFrameIndex];
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &mRenderCompleteSemaphore[mFrameIndex];
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pCommandBuffers = &mCmdBuffers[currentBuffer];
-    submitInfo.commandBufferCount = 1;
-    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[mFrameIndex]));
-
-    VkResult present = swapChain.queuePresent(queue, currentBuffer, mRenderCompleteSemaphore[mFrameIndex]);
-    if (!((present == VK_SUCCESS) || (present == VK_SUBOPTIMAL_KHR)))
-    {
-        if (present == VK_ERROR_OUT_OF_DATE_KHR) {
-            WindowResized();
-            return;
-        }
-        else {
-            VK_CHECK_RESULT(present);
-        }
-    }
+//    VK_CHECK_RESULT(vkWaitForFences(device, 1, &waitFences[mFrameIndex], VK_TRUE, UINT64_MAX));
+//    VK_CHECK_RESULT(vkResetFences(device, 1, &waitFences[mFrameIndex]));
+//
+//    VkResult aquired = swapChain.acquireNextImage(mPresentCompleteSemaphore[mFrameIndex], &currentBuffer);
+//    if (aquired == VK_ERROR_OUT_OF_DATE_KHR || aquired == VK_SUBOPTIMAL_KHR) WindowResized();
+//    else VK_CHECK_RESULT(aquired);
+//
+//    UpdateUniformBuffers();
+//    UniformBufferSet currentUB = mUniformBuffers[currentBuffer];
+//    memcpy(currentUB.mUBOScene.mapped, &mShaderValScene, sizeof(mShaderValScene));
+//    memcpy(currentUB.mUBOParams.mapped, &mShaderParams, sizeof(mShaderParams));
+//    memcpy(currentUB.mUBOSkybox.mapped, &mShaderValSkybox, sizeof(mShaderValSkybox));
+//
+//    const VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+//    VkSubmitInfo submitInfo = vks::initializers::submitInfo();
+//    submitInfo.pWaitDstStageMask = &waitDstStageMask;
+//    submitInfo.pWaitSemaphores = &mPresentCompleteSemaphore[mFrameIndex];
+//    submitInfo.waitSemaphoreCount = 1;
+//    submitInfo.pSignalSemaphores = &mRenderCompleteSemaphore[mFrameIndex];
+//    submitInfo.signalSemaphoreCount = 1;
+//    submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
+//    submitInfo.commandBufferCount = 1;
+//    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[mFrameIndex]));
+//
+//    VkResult present = swapChain.queuePresent(queue, currentBuffer, mRenderCompleteSemaphore[mFrameIndex]);
+//    if (!((present == VK_SUCCESS) || (present == VK_SUBOPTIMAL_KHR)))
+//    {
+//        if (present == VK_ERROR_OUT_OF_DATE_KHR) {
+//            WindowResized();
+//            return;
+//        }
+//        else {
+//            VK_CHECK_RESULT(present);
+//        }
+//    }
 
     mFrameIndex += 1;
     mFrameIndex %= mRenderAhead;
@@ -1466,15 +1467,15 @@ void PBRRenderer::Render()
 
 void PBRRenderer::ViewChanged()
 {
-    VulkanFramework::ViewChanged();
-}
-
-void PBRRenderer::WindowResized()
-{
-    BuildCommandBuffers();
-    vkDeviceWaitIdle(device);
     UpdateUniformBuffers();
 }
+
+//void PBRRenderer::WindowResized()
+//{
+//    BuildCommandBuffers();
+//    vkDeviceWaitIdle(device);
+//    UpdateUniformBuffers();
+//}
 
 void PBRRenderer::OnUpdateUIOverlay(vks::UIOverlay *overlay)
 {

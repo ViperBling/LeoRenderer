@@ -348,7 +348,7 @@ void VulkanFramework::nextFrame()
 	tPrevEnd = tEnd;
 	
 	// TODO: Cap UI overlay update rates
-//	updateOverlay();
+	updateOverlay();
 }
 
 void VulkanFramework::RenderLoop()

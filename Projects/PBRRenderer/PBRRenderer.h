@@ -124,7 +124,7 @@ public:
     void Prepare() override;
     void Render() override;
     void ViewChanged() override;
-    void WindowResized() override;
+    // void WindowResized() override;
     void OnUpdateUIOverlay(vks::UIOverlay* overlay) override;
     void FileDropped(std::string & filename) override;
 
@@ -143,7 +143,7 @@ public:
     VkPipeline mBoundPipeline = VK_NULL_HANDLE;
 
     std::vector<DescriptorSets> mDescSets;
-    std::vector<VkCommandBuffer> mCmdBuffers;
+    // std::vector<VkCommandBuffer> mCmdBuffers;
     std::vector<UniformBufferSet> mUniformBuffers;
 
     std::vector<VkSemaphore> mRenderCompleteSemaphore;
