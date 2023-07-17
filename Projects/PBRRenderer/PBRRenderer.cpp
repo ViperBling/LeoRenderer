@@ -16,6 +16,7 @@ PBRRenderer::~PBRRenderer()
 {
     vkDestroyPipeline(device, mPipelines.mPipelineSkyBox, nullptr);
     vkDestroyPipeline(device, mPipelines.mPipelinePBR, nullptr);
+    vkDestroyPipeline(device, mPipelines.mPipelineDoubleSided, nullptr);
     vkDestroyPipeline(device, mPipelines.mPipelinePBRAlphaBlend, nullptr);
 
     vkDestroyPipelineLayout(device, mPipelineLayout, nullptr);
@@ -151,7 +152,8 @@ void PBRRenderer::LoadScene(std::string& filename)
 void PBRRenderer::LoadEnvironment(std::string& filename)
 {
     std::cout << "Loading environment from " << filename << std::endl;
-    if (mTextures.mTexEnvCube.image) {
+    if (mTextures.mTexEnvCube.image)
+    {
         mTextures.mTexEnvCube.destroy();
         mTextures.mTexIrradianceCube.destroy();
         mTextures.mTexPreFilterCube.destroy();
@@ -1366,11 +1368,11 @@ void PBRRenderer::Prepare()
     mDescSets.resize(swapChain.imageCount);
 
     // Command buffer execution fences
-    for (auto & fence : waitFences)
-    {
-        VkFenceCreateInfo fenceCI{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
-        VK_CHECK_RESULT(vkCreateFence(device, &fenceCI, nullptr, &fence))
-    }
+    // for (auto & fence : waitFences)
+    // {
+    //     VkFenceCreateInfo fenceCI{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
+    //     VK_CHECK_RESULT(vkCreateFence(device, &fenceCI, nullptr, &fence))
+    // }
     for (auto & sem : mPresentCompleteSemaphore)
     {
         VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };

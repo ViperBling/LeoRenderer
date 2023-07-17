@@ -161,7 +161,7 @@ public:
     int32_t mDebugViewInputs = 0;
     int32_t mDebugViewEquation = 0;
 
-    const uint32_t mRenderAhead = 2;
+    const uint32_t mRenderAhead = 3;
     uint32_t mFrameIndex = 0;
 
     int32_t mAnimationIndex = 0;
