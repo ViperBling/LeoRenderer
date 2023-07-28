@@ -7,17 +7,20 @@ project(${NAME})
 
 include_directories(External)
 include_directories(External/GLM)
+include_directories(External/VMA)
 include_directories(External/ImGui)
 include_directories(External/TinyGLTF)
+include_directories(External/FastGLTF)
 include_directories(External/KTX/include)
 include_directories(External/KTX/other_include)
+include_directories(External/Vulkan)
 include_directories(Common)
-include_directories(Common/Vulkan)
+include_directories(Common/VulkanObject)
 
-OPTION(USE_D2D_WSI "Build the project using Direct to Display swapchain" OFF)
-OPTION(USE_DIRECTFB_WSI "Build the project using DirectFB swapchain" OFF)
-OPTION(USE_WAYLAND_WSI "Build the project using Wayland swapchain" OFF)
-OPTION(USE_HEADLESS "Build the project using headless extension swapchain" OFF)
+#OPTION(USE_D2D_WSI "Build the project using Direct to Display swapchain" OFF)
+#OPTION(USE_DIRECTFB_WSI "Build the project using DirectFB swapchain" OFF)
+#OPTION(USE_WAYLAND_WSI "Build the project using Wayland swapchain" OFF)
+#OPTION(USE_HEADLESS "Build the project using headless extension swapchain" OFF)
 
 set(RESOURCE_INSTALL_DIR "" CACHE PATH "Path to install resources to (leave empty for running uninstalled)")
 
@@ -43,7 +46,7 @@ ENDIF()
 IF (NOT Vulkan_FOUND)
     message(FATAL_ERROR "Could not find Vulkan library!")
 ELSE()
-    message(STATUS "Found Vulkna in: " ${Vulkan_LIBRARY})
+    message(STATUS "Found Vulkan in: " ${Vulkan_LIBRARY})
 ENDIF()
 
 # Set preprocessor defines
@@ -68,19 +71,14 @@ function(buildProjects)
 endfunction(buildProjects)
 
 if(RESOURCE_INSTALL_DIR)
-    add_definitions(-DVK_PROJECT_ASSETS_DIR=\"${RESOURCE_INSTALL_DIR}/\")
+    add_definitions(-DVK_ASSETS_DIR=\"${RESOURCE_INSTALL_DIR}/\")
     install(DIRECTORY Assets/ DESTINATION ${RESOURCE_INSTALL_DIR}/)
 else()
-    add_definitions(-DVK_PROJECT_ASSETS_DIR=\"${CMAKE_SOURCE_DIR}/Assets/\")
+    add_definitions(-DVK_ASSETS_DIR=\"${CMAKE_SOURCE_DIR}/Assets/\")
 endif()
 
 # Compiler specific stuff
-IF(MSVC)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
-ELSEIF(APPLE)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fobjc-arc -xobjective-c++")
-ENDIF(MSVC)
-
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Bin/")
 
 add_subdirectory(Common)

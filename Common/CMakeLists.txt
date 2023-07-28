@@ -12,8 +12,4 @@ set(KTX_SOURCES
 
 add_library(CommonLib STATIC ${BASE_SRC} ${KTX_SOURCES})
 
-if(WIN32)
-    target_link_libraries(CommonLib ${Vulkan_LIBRARY} ${WINLIBS})
-else(WIN32)
-    target_link_libraries(CommonLib ${Vulkan_LIBRARY} ${XCB_LIBRARIES} ${WAYLAND_CLIENT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-endif(WIN32)
+target_link_libraries(CommonLib ${Vulkan_LIBRARY} ${WINLIBS})
