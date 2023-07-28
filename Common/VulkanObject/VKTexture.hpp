@@ -22,18 +22,9 @@ namespace LeoVK
     class Texture
     {
     public:
-        void Create();
         void Destroy();
         void UpdateDescriptor();
         ktxResult LoadKTXFile(std::string filename, ktxTexture** target);
-        void LoadTextureFromFile(
-            ktxTexture* ktxTex,
-            VkFormat format,
-            LeoVK::VulkanDevice *device,
-            VkQueue copyQueue,
-            VkImageUsageFlags imageUsageFlags,
-            VkImageLayout imageLayout,
-            uint32_t layerCount);
 
     public:
         LeoVK::VulkanDevice*  mpDevice;
@@ -64,33 +55,32 @@ namespace LeoVK
             VkImageLayout           imageLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         void LoadFromImage(
-            tinygltf::Image& gltfImage,
-            TextureSampler textureSampler,
-            LeoVK::VulkanDevice* device,
-            VkQueue copyQueue
+            tinygltf::Image&        gltfImage,
+            TextureSampler          textureSampler,
+            LeoVK::VulkanDevice*    device,
+            VkQueue                 copyQueue
         );
 
         void LoadFromFile(
-            std::string filename,
-            VkFormat format,
+            std::string         filename,
+            VkFormat            format,
             LeoVK::VulkanDevice *device,
-            VkQueue copyQueue,
-            VkImageUsageFlags imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
-            VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            VkQueue             copyQueue,
+            VkImageUsageFlags   imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
+            VkImageLayout       imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
-
     };
 
     class Texture2DArray : public Texture
     {
     public:
         void LoadFromFile(
-            std::string filename,
-            VkFormat format,
+            std::string         filename,
+            VkFormat            format,
             LeoVK::VulkanDevice *device,
-            VkQueue copyQueue,
-            VkImageUsageFlags imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
-            VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            VkQueue             copyQueue,
+            VkImageUsageFlags   imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
+            VkImageLayout       imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
     };
 
@@ -98,13 +88,12 @@ namespace LeoVK
     {
     public:
         void LoadFromFile(
-            std::string filename,
-            VkFormat format,
+            std::string         filename,
+            VkFormat            format,
             LeoVK::VulkanDevice *device,
-            VkQueue copyQueue,
-            VkImageUsageFlags imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
-            VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            VkQueue             copyQueue,
+            VkImageUsageFlags   imageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT,
+            VkImageLayout       imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
     };
-
 }

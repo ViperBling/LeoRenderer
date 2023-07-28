@@ -1006,7 +1006,7 @@ namespace fastgltf {
     struct Material {
         /**
          * A set of parameter values that are used to define the metallic-roughness material model
-         * from Physically Based Rendering (PBR) methodology. When undefined, all the default
+         * from Physically Based Rendering (VulkanRenderer) methodology. When undefined, all the default
          * values of pbrMetallicRoughness MUST apply.
          */
         std::optional<PBRData> pbrData;
