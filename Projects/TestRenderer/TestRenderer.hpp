@@ -83,9 +83,9 @@ struct Pipelines
 
 struct DescSetLayouts
 {
-    VkDescriptorSetLayout mSceneDescSetLayout;
-    VkDescriptorSetLayout mMaterialDescSetLayout;
-    VkDescriptorSetLayout mNodeDescSetLayout;
+    VkDescriptorSetLayout mSceneLayout;
+    VkDescriptorSetLayout mMaterialLayout;
+    VkDescriptorSetLayout mNodeLayout;
 };
 
 struct DescSets
@@ -105,9 +105,10 @@ public:
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
 
-    void LoadScene(std::string filename);
+    void RenderNode(LeoVK::Node* node, uint32_t cbIdx, LeoVK::Material::AlphaMode alphaMode);
+    void LoadScene(const std::string& filename);
     void LoadAssets();
-    void LoadEnv();
+    void LoadEnv(const std::string& filename);
     void GenerateCubeMap();
     void GeneratePrefilterCube();
     void GenerateLUT();
@@ -140,14 +141,13 @@ public:
     int32_t     mDebugViewInputs = 0;
     int32_t     mDebugViewEquation = 0;
 
+    RenderScene         mRenderScene;
     SceneTextures       mSceneTextures;
     LightSource         mLight;
     UBOMatrices         mSceneMats, mSkyboxMats;
     UBOParams           mShaderParams;
     DescSetLayouts      mDescSetLayouts;
-
-    RenderScene         mRenderScene;
-
+    Pipelines           mPipelines;
     VkPipeline          mBoundPipeline = VK_NULL_HANDLE;
     VkPipelineLayout    mPipelineLayout;
 

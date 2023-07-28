@@ -135,18 +135,18 @@ namespace LeoVK
         for (auto& child : mChildren) delete child;
     }
 
-    void GLTFScene::Destroy(VkDevice deivce)
+    void GLTFScene::Destroy(VkDevice device)
     {
         if (mVertices.mBuffer != VK_NULL_HANDLE)
         {
-            vkDestroyBuffer(deivce, mVertices.mBuffer, nullptr);
-            vkFreeMemory(deivce, mVertices.mMemory, nullptr);
+            vkDestroyBuffer(device, mVertices.mBuffer, nullptr);
+            vkFreeMemory(device, mVertices.mMemory, nullptr);
             mVertices.mBuffer = VK_NULL_HANDLE;
         }
         if (mIndices.mBuffer != VK_NULL_HANDLE)
         {
-            vkDestroyBuffer(deivce, mIndices.mBuffer, nullptr);
-            vkFreeMemory(deivce, mIndices.mMemory, nullptr);
+            vkDestroyBuffer(device, mIndices.mBuffer, nullptr);
+            vkFreeMemory(device, mIndices.mMemory, nullptr);
             mIndices.mBuffer = VK_NULL_HANDLE;
         }
 
@@ -825,7 +825,7 @@ namespace LeoVK
     }
 
     void GLTFScene::LoadFromFile(
-        std::string &filename,
+        const std::string& filename,
         LeoVK::VulkanDevice *device,
         VkQueue transferQueue,
         float scale)

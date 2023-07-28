@@ -227,7 +227,7 @@ namespace LeoVK
     class GLTFScene
     {
     public:
-        void Destroy(VkDevice deivce);
+        void Destroy(VkDevice device);
         void LoadNode(LeoVK::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, LoaderInfo& loaderInfo, float globalScale);
         void GetNodeProperty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
         void LoadSkins(tinygltf::Model& gltfModel);
@@ -237,7 +237,7 @@ namespace LeoVK
         void LoadTextureSamplers(tinygltf::Model& gltfModel);
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);
-        void LoadFromFile(std::string& filename, LeoVK::VulkanDevice* device, VkQueue transferQueue, float scale = 1.0f);
+        void LoadFromFile(const std::string& filename, LeoVK::VulkanDevice* device, VkQueue transferQueue, float scale = 1.0f);
         void DrawNode(Node* node, VkCommandBuffer commandBuffer);
         void Draw(VkCommandBuffer commandBuffer);
         void CalculateBoundingBox(Node* node, Node* parent);
