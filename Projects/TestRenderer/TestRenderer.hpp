@@ -101,6 +101,7 @@ public:
     virtual ~TestRenderer();
     void GetEnabledFeatures() override;
     void BuildCommandBuffers() override;
+    void Prepare() override;
     void Render() override;
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;

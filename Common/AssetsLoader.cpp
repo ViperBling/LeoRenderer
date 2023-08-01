@@ -979,13 +979,22 @@ namespace LeoVK
         GetSceneDimensions();
     }
 
-    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer)
+    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag)
     {
         if (node->mpMesh)
         {
             for (Primitive *primitive : node->mpMesh->mPrimitives)
             {
-                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                bool skip = false;
+                const Material& mat = primitive->mMaterial;
+                if (renderFlag & Material::ALPHA_MODE_OPAQUE) skip = (mat.mAlphaMode != Material::ALPHA_MODE_OPAQUE);
+                if (renderFlag & Material::ALPHA_MODE_MASK) skip = (mat.mAlphaMode != Material::ALPHA_MODE_MASK);
+                if (renderFlag & Material::ALPHA_MODE_BLEND) skip = (mat.mAlphaMode != Material::ALPHA_MODE_BLEND);
+
+                if (!skip)
+                {
+                    vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                }
             }
         }
         for (auto& child : node->mChildren)
@@ -994,14 +1003,14 @@ namespace LeoVK
         }
     }
 
-    void GLTFScene::Draw(VkCommandBuffer commandBuffer)
+    void GLTFScene::Draw(VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag)
     {
         const VkDeviceSize offsets[1] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.mBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
         for (auto& node : mNodes)
         {
-            DrawNode(node, commandBuffer);
+            DrawNode(node, commandBuffer, renderFlag);
         }
     }
 
