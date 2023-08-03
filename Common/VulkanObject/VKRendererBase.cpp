@@ -1085,13 +1085,20 @@ void VKRendererBase::OnHandleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 // Protected
 std::string VKRendererBase::GetShadersPath() const
 {
-    return std::string();
+    return GetAssetsPath() + "Shaders/" + mShaderDir + "/";
 }
 
 // Private
 std::string VKRendererBase::getWindowTitle()
 {
-    return GetAssetsPath() + "Shaders/" + mShaderDir + "/";
+    std::string device(mDeviceProps.deviceName);
+    std::string windowTitle;
+    windowTitle = mTitle + " - " + device;
+    if (!mSettings.overlay)
+    {
+        windowTitle += " - " + std::to_string(mFrameCounter) + " fps";
+    }
+    return windowTitle;
 }
 
 void VKRendererBase::windowResizing()

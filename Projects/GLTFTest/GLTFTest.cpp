@@ -64,26 +64,32 @@ void GLTFTest::BuildCommandBuffers()
 void GLTFTest::Prepare()
 {
     VKRendererBase::Prepare();
+    LoadAssets();
+    SetupUniformBuffers();
+    SetupDescriptors();
+    SetupPipelines();
+    BuildCommandBuffers();
+
+    mbPrepared = true;
 }
 
 void GLTFTest::Render()
 {
-
+    RenderFrame();
+    if (mCamera.mbUpdated) UpdateUniformBuffers();
 }
 
 void GLTFTest::ViewChanged()
 {
-    VKRendererBase::ViewChanged();
+    UpdateUniformBuffers();
 }
 
 void GLTFTest::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 {
-    VKRendererBase::OnUpdateUIOverlay(overlay);
-}
+    if (overlay->Header("Settings"))
+    {
 
-void GLTFTest::RenderNode(LeoVK::Node *node, uint32_t cbIdx, LeoVK::Material::AlphaMode alphaMode)
-{
-
+    }
 }
 
 void GLTFTest::LoadAssets()
@@ -183,20 +189,46 @@ void GLTFTest::SetupPipelines()
     ssStateCIs[0] = LoadShader(GetShadersPath() + "GLTFTest/Scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     ssStateCIs[1] = LoadShader(GetShadersPath() + "GLTFTest/Scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VK_CHECK(vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1, &pipelineCI, nullptr, &));
+    VK_CHECK(vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1, &pipelineCI, nullptr, &mPipeline));
 }
 
 void GLTFTest::SetupUniformBuffers()
 {
+    VK_CHECK(mpVulkanDevice->CreateBuffer(
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &mUniforms.mBuffer,
+        sizeof(mUniforms.mValues)))
 
+    VK_CHECK(mUniforms.mBuffer.Map())
+    UpdateUniformBuffers();
 }
 
 void GLTFTest::UpdateUniformBuffers()
 {
-
+    mUniforms.mValues.mProj = mCamera.mMatrices.mPerspective;
+    mUniforms.mValues.mView = mCamera.mMatrices.mView;
+    mUniforms.mValues.mViewPos = mCamera.mViewPos;
+    memcpy(mUniforms.mBuffer.mpMapped, &mUniforms.mValues, sizeof(mUniforms.mValues));
 }
 
-void GLTFTest::PreRender()
+GLTFTest * testRenderer;
+LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-
+    if (testRenderer != nullptr)
+    {
+        testRenderer->HandleMessages(hWnd, uMsg, wParam, lParam);
+    }
+    return (DefWindowProc(hWnd, uMsg, wParam, lParam));
+}
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+{
+    for (int32_t i = 0; i < __argc; i++) { GLTFTest::mArgs.push_back(__argv[i]); };
+    testRenderer = new GLTFTest();
+    testRenderer->InitVulkan();
+    testRenderer->SetupWindow(hInstance, WndProc);
+    testRenderer->Prepare();
+    testRenderer->RenderLoop();
+    delete(testRenderer);
+    return 0;
 }

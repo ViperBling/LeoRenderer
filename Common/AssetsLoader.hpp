@@ -1,11 +1,13 @@
 ﻿#pragma once
 
 #include "ProjectPCH.hpp"
+
+#define TINYGLTF_NO_STB_IMAGE_WRITE
 #include "tiny_gltf.h"
+
 #include "VKDevice.hpp"
 #include "VKTexture.hpp"
 
-#define TINYGLTF_NO_STB_IMAGE_WRITE
 
 #if defined(_WIN32) && defined(ERROR) && defined(TINYGLTF_ENABLE_DRACO)
 #undef ERROR

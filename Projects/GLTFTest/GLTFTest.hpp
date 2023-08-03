@@ -36,20 +36,17 @@ public:
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
 
-    void RenderNode(LeoVK::Node* node, uint32_t cbIdx, LeoVK::Material::AlphaMode alphaMode);
-    void LoadScene(const std::string& filename);
     void LoadAssets();
-
     void SetupDescriptors();
     void SetupPipelines();
     void SetupUniformBuffers();
     void UpdateUniformBuffers();
-    void PreRender();
 
 public:
     LeoVK::GLTFScene mRenderScene;
 
     UBOAndParams mUniforms;
+    VkPipeline mPipeline;
     VkPipelineLayout  mPipelineLayout;
     VkDescriptorSet mDescSet;
     DescriptorSetLayouts mDescSetLayouts;
