@@ -185,7 +185,7 @@ namespace LeoVK
             &stagingBuffer,
             uploadSize))
 
-        stagingBuffer.Map();
+        VK_CHECK(stagingBuffer.Map())
         memcpy(stagingBuffer.mpMapped, fontData, uploadSize);
         stagingBuffer.UnMap();
 

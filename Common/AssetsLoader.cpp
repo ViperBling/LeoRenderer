@@ -13,6 +13,8 @@ namespace LeoVK
         LeoVK::VulkanDevice *device,
         VkQueue copyQueue)
     {
+        texture->mpDevice = device;
+        
         unsigned char* buffer;
         VkDeviceSize bufferSize;
         bool deleteBuffer = false;

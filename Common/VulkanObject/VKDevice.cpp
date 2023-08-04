@@ -59,7 +59,7 @@ namespace LeoVK
                 if ((mMemoryProperties.memoryTypes[i].propertyFlags & memProps) == memProps)
                 {
                     if (memTypeFound) *memTypeFound = true;
-                    return 1;
+                    return i;
                 }
             }
             typeBits >>= 1;

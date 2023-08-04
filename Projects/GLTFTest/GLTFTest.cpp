@@ -51,7 +51,7 @@ void GLTFTest::BuildCommandBuffers()
         vkCmdSetScissor(mDrawCmdBuffers[i], 0, 1, &scissor);
 
         vkCmdBindDescriptorSets(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
-
+        vkCmdBindPipeline(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
         mRenderScene.Draw(mDrawCmdBuffers[i]);
 
         DrawUI(mDrawCmdBuffers[i]);
@@ -125,7 +125,7 @@ void GLTFTest::SetupDescriptors()
         mDescSetLayouts.mMatricesDesc, mDescSetLayouts.mTexturesDesc
     };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
-    VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), 0);
+    VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
     pipelineLayoutCI.pushConstantRangeCount = 1;
     pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout))
@@ -139,6 +139,7 @@ void GLTFTest::SetupDescriptors()
     {
         descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mTexturesDesc, 1);
         VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &mat.mDescriptorSet))
+        if (mat.mpBaseColorTexture == nullptr || mat.mpNormalTexture == nullptr) break;
         VkDescriptorImageInfo colorMap = mat.mpBaseColorTexture->mDescriptor;
         VkDescriptorImageInfo normalMap = mat.mpNormalTexture->mDescriptor;
         std::vector<VkWriteDescriptorSet> writeDescSets = {
