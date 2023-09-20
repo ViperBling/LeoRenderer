@@ -107,17 +107,17 @@ void GLTFTest::SetupDescriptors()
     VkDescriptorPoolCreateInfo descPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descPoolCI, nullptr, &mDescPool))
 
-    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+    std::vector<VkDescriptorSetLayoutBinding> uniformSetLayoutBindings = {
         LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
     };
-    VkDescriptorSetLayoutCreateInfo descSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(setLayoutBindings);
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(uniformSetLayoutBindings);
     VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &descSetLayoutCI, nullptr, &mDescSetLayouts.mMatricesDesc))
 
-    setLayoutBindings = {
+    std::vector<VkDescriptorSetLayoutBinding> samplerSetLayoutBindings = {
         LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
         LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
     };
-    descSetLayoutCI.pBindings = setLayoutBindings.data();
+    descSetLayoutCI.pBindings = samplerSetLayoutBindings.data();
     descSetLayoutCI.bindingCount = 2;
     VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &descSetLayoutCI, nullptr, &mDescSetLayouts.mTexturesDesc))
 
@@ -125,9 +125,9 @@ void GLTFTest::SetupDescriptors()
         mDescSetLayouts.mMatricesDesc, mDescSetLayouts.mTexturesDesc
     };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
-//    VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
-//    pipelineLayoutCI.pushConstantRangeCount = 1;
-//    pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
+    // VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
+    // pipelineLayoutCI.pushConstantRangeCount = 1;
+    // pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout))
 
     VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mMatricesDesc, 1);
