@@ -125,9 +125,9 @@ void GLTFTest::SetupDescriptors()
         mDescSetLayouts.mMatricesDesc, mDescSetLayouts.mTexturesDesc
     };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
-    VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
-    pipelineLayoutCI.pushConstantRangeCount = 1;
-    pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
+//    VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
+//    pipelineLayoutCI.pushConstantRangeCount = 1;
+//    pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout))
 
     VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mMatricesDesc, 1);
@@ -137,8 +137,8 @@ void GLTFTest::SetupDescriptors()
 
     for (auto & mat : mRenderScene.mMaterials)
     {
-        descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mTexturesDesc, 1);
-        VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &mat.mDescriptorSet))
+        const VkDescriptorSetAllocateInfo matDescSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mTexturesDesc, 1);
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &matDescSetAI, &mat.mDescriptorSet))
         if (mat.mpBaseColorTexture == nullptr || mat.mpNormalTexture == nullptr) break;
         VkDescriptorImageInfo colorMap = mat.mpBaseColorTexture->mDescriptor;
         VkDescriptorImageInfo normalMap = mat.mpNormalTexture->mDescriptor;
