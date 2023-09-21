@@ -1203,7 +1203,7 @@ namespace LeoVK
         GetSceneDimensions();
     }
 
-    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag)
+    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
     {
         if (node->mpMesh)
         {
@@ -1217,6 +1217,10 @@ namespace LeoVK
 
                 if (!skip)
                 {
+                    if (renderFlag & Material::BINDIMAGES)
+                    {
+                        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &mat.mDescriptorSet, 0, nullptr);
+                    }
                     vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
                 }
             }
@@ -1227,14 +1231,14 @@ namespace LeoVK
         }
     }
 
-    void GLTFScene::Draw(VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag)
+    void GLTFScene::Draw(VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
     {
         const VkDeviceSize offsets[1] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.mBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
         for (auto& node : mNodes)
         {
-            DrawNode(node, commandBuffer, renderFlag);
+            DrawNode(node, commandBuffer, renderFlag, pipelineLayout, bindImageSet);
         }
     }
 
