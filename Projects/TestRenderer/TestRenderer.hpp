@@ -22,7 +22,6 @@ public:
     virtual ~TestRenderer();
     void GetEnabledFeatures() override;
     void SetupRenderPass() override;
-    void SetupFrameBuffer() override;
     void BuildCommandBuffers() override;
     void Prepare() override;
     void Render() override;

@@ -12,9 +12,11 @@ GLTFTest::GLTFTest() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
 
 GLTFTest::~GLTFTest()
 {
+    vkDestroyPipeline(mDevice, mPipeline, nullptr);
     vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(mDevice, mDescSetLayouts.mMatricesDesc, nullptr);
     vkDestroyDescriptorSetLayout(mDevice, mDescSetLayouts.mTexturesDesc, nullptr);
+    mRenderScene.Destroy(mDevice);
     mUniforms.mBuffer.Destroy();
 }
 
@@ -52,7 +54,7 @@ void GLTFTest::BuildCommandBuffers()
 
         vkCmdBindDescriptorSets(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSet, 0, nullptr);
         vkCmdBindPipeline(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
-        mRenderScene.Draw(mDrawCmdBuffers[i]);
+        mRenderScene.Draw(mDrawCmdBuffers[i], mPipelineLayout, 1, LeoVK::Material::BINDIMAGES);
 
         DrawUI(mDrawCmdBuffers[i]);
 
@@ -99,6 +101,7 @@ void GLTFTest::LoadAssets()
 
 void GLTFTest::SetupDescriptors()
 {
+    // Create DescSetPool
     std::vector<VkDescriptorPoolSize> poolSize = {
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(mRenderScene.mMaterials.size()) * 2)
@@ -107,6 +110,7 @@ void GLTFTest::SetupDescriptors()
     VkDescriptorPoolCreateInfo descPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descPoolCI, nullptr, &mDescPool))
 
+    // Create DescSetLayout
     std::vector<VkDescriptorSetLayoutBinding> uniformSetLayoutBindings = {
         LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
     };
@@ -121,15 +125,14 @@ void GLTFTest::SetupDescriptors()
     descSetLayoutCI.bindingCount = 2;
     VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &descSetLayoutCI, nullptr, &mDescSetLayouts.mTexturesDesc))
 
+    // Create PipelineLayout
     std::array<VkDescriptorSetLayout, 2> setLayouts = {
         mDescSetLayouts.mMatricesDesc, mDescSetLayouts.mTexturesDesc
     };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
-    // VkPushConstantRange pushConstRange = LeoVK::Init::PushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::mat4), 0);
-    // pipelineLayoutCI.pushConstantRangeCount = 1;
-    // pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout))
 
+    // Setup DescSet
     VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayouts.mMatricesDesc, 1);
     VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &mDescSet))
     VkWriteDescriptorSet writeDescSet = LeoVK::Init::WriteDescriptorSet(mDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mUniforms.mBuffer.mDescriptor);
@@ -210,6 +213,16 @@ void GLTFTest::UpdateUniformBuffers()
     mUniforms.mValues.mProj = mCamera.mMatrices.mPerspective;
     mUniforms.mValues.mView = mCamera.mMatrices.mView;
     mUniforms.mValues.mViewPos = mCamera.mViewPos;
+
+    float scale = (1.0f / std::max(mRenderScene.mAABB[0][0], std::max(mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]))) * 0.5f;
+    glm::vec3 translate = -glm::vec3(mRenderScene.mAABB[3][0], mRenderScene.mAABB[3][1], mRenderScene.mAABB[3][2]);
+    translate += -0.5f * glm::vec3(mRenderScene.mAABB[0][0], mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]);
+    mUniforms.mValues.mModel = glm::mat4(1.0f);
+    mUniforms.mValues.mModel[0][0] = scale;
+    mUniforms.mValues.mModel[1][1] = scale;
+    mUniforms.mValues.mModel[2][2] = scale;
+    mUniforms.mValues.mModel = glm::translate(mUniforms.mValues.mModel, translate);
+
     memcpy(mUniforms.mBuffer.mpMapped, &mUniforms.mValues, sizeof(mUniforms.mValues));
 }
 

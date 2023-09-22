@@ -48,9 +48,9 @@ function(buildProjects)
 endfunction(buildProjects)
 
 set(PROJECTS
-    TestRenderer
+    # TestRenderer
     # VulkanRenderer
-    # GLTFTest
+    GLTFTest
     )
 
 buildProjects()

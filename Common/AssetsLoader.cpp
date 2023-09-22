@@ -1203,7 +1203,7 @@ namespace LeoVK
         GetSceneDimensions();
     }
 
-    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
+    void GLTFScene::DrawNode(Node *node, VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t bindImageSet, Material::AlphaMode renderFlag)
     {
         if (node->mpMesh)
         {
@@ -1217,28 +1217,25 @@ namespace LeoVK
 
                 if (!skip)
                 {
-                    if (renderFlag & Material::BINDIMAGES)
-                    {
-                        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &mat.mDescriptorSet, 0, nullptr);
-                    }
+                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &mat.mDescriptorSet, 0, nullptr);
                     vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
                 }
             }
         }
         for (auto& child : node->mChildren)
         {
-            DrawNode(child, commandBuffer);
+            DrawNode(child, commandBuffer, pipelineLayout, bindImageSet, renderFlag);
         }
     }
 
-    void GLTFScene::Draw(VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
+    void GLTFScene::Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t bindImageSet, Material::AlphaMode renderFlag)
     {
         const VkDeviceSize offsets[1] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertices.mBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
         for (auto& node : mNodes)
         {
-            DrawNode(node, commandBuffer, renderFlag, pipelineLayout, bindImageSet);
+            DrawNode(node, commandBuffer, pipelineLayout, bindImageSet, renderFlag);
         }
     }
 

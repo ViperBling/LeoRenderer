@@ -241,8 +241,8 @@ namespace LeoVK
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);
         void LoadFromFile(const std::string& filename, LeoVK::VulkanDevice* device, VkQueue transferQueue, float scale = 1.0f);
-        void DrawNode(Node* node, VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag = Material::ALPHA_MODE_OPAQUE, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);
-        void Draw(VkCommandBuffer commandBuffer, Material::AlphaMode renderFlag = Material::ALPHA_MODE_OPAQUE, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1);
+        void DrawNode(Node* node, VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1, Material::AlphaMode renderFlag = Material::ALPHA_MODE_OPAQUE);
+        void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout = VK_NULL_HANDLE, uint32_t bindImageSet = 1, Material::AlphaMode renderFlag = Material::ALPHA_MODE_OPAQUE);
         void CalculateBoundingBox(Node* node, Node* parent);
         void GetSceneDimensions();
         void UpdateAnimation(uint32_t index, float time);
