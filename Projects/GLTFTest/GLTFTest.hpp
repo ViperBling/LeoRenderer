@@ -11,7 +11,6 @@ struct UBOAndParams
     LeoVK::Buffer mBuffer;
     struct Values
     {
-        glm::mat4 mModel;
         glm::mat4 mProj;
         glm::mat4 mView;
         glm::vec4 mLightPos = glm::vec4(0.0f, 2.5f, 0.0f, 0.0f);

@@ -10,7 +10,7 @@ VKRendererBase::VKRendererBase(bool msaa, bool enableValidation)
     if (stat(GetAssetsPath().c_str(), &info) != 0)
     {
         std::string msg = "Could not locate asset path in \"" + GetAssetsPath() + "\" !";
-        MessageBox(nullptr, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
+        MessageBoxA(nullptr, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
         exit(-1);
     }
 
@@ -268,7 +268,7 @@ void VKRendererBase::SetupConsole(std::string title)
     freopen_s(&stream, "CONIN$", "r", stdin);
     freopen_s(&stream, "CONOUT$", "w+", stdout);
     freopen_s(&stream, "CONOUT$", "w+", stderr);
-    SetConsoleTitle(TEXT(title.c_str()));
+    SetConsoleTitleA(title.c_str());
 }
 
 void VKRendererBase::SetupDPIAwareness()
@@ -294,7 +294,7 @@ HWND VKRendererBase::SetupWindow(HINSTANCE hInstance, WNDPROC wndProc)
 {
     this->mHInstance = hInstance;
 
-    WNDCLASSEX wndClass;
+    WNDCLASSEXA wndClass;
 
     wndClass.cbSize = sizeof(WNDCLASSEX);
     wndClass.style = CS_HREDRAW | CS_VREDRAW;
@@ -309,7 +309,7 @@ HWND VKRendererBase::SetupWindow(HINSTANCE hInstance, WNDPROC wndProc)
     wndClass.lpszClassName = mName.c_str();
     wndClass.hIconSm = LoadIcon(nullptr, IDI_WINLOGO);
 
-    if (!RegisterClassEx(&wndClass))
+    if (!RegisterClassExA(&wndClass))
     {
         std::cout << "Could not register window class!\n";
         fflush(stdout);
@@ -332,7 +332,7 @@ HWND VKRendererBase::SetupWindow(HINSTANCE hInstance, WNDPROC wndProc)
             dmScreenSettings.dmFields     = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
             if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL)
             {
-                if (MessageBox(nullptr, "Fullscreen Mode not supported!\n Switch to window mode?", "Error", MB_YESNO | MB_ICONEXCLAMATION) == IDYES)
+                if (MessageBoxA(nullptr, "Fullscreen Mode not supported!\n Switch to window mode?", "Error", MB_YESNO | MB_ICONEXCLAMATION) == IDYES)
                 {
                     mSettings.fullscreen = false;
                 }
@@ -369,7 +369,7 @@ HWND VKRendererBase::SetupWindow(HINSTANCE hInstance, WNDPROC wndProc)
     AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
 
     std::string windowTitle = getWindowTitle();
-    mHwnd = CreateWindowEx(
+    mHwnd = CreateWindowExA(
         0,
         mName.c_str(),
         windowTitle.c_str(),
@@ -1223,7 +1223,7 @@ void VKRendererBase::nextFrame()
 
         if (!mSettings.overlay)	{
             std::string windowTitle = getWindowTitle();
-            SetWindowText(mHwnd, windowTitle.c_str());
+            SetWindowTextA(mHwnd, windowTitle.c_str());
         }
         mFrameCounter = 0;
         mLastTimestamp = tEnd;

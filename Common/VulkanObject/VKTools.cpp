@@ -276,7 +276,7 @@ namespace LeoVK::VKTools
     {
         if (!bErrorModeSilent)
         {
-            MessageBox(nullptr, message.c_str(), nullptr, MB_OK | MB_ICONERROR);
+            MessageBoxA(nullptr, message.c_str(), nullptr, MB_OK | MB_ICONERROR);
         }
         std::cerr << message << "\n";
         exit(exitCode);

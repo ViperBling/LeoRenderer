@@ -96,7 +96,7 @@ void GLTFTest::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 
 void GLTFTest::LoadAssets()
 {
-    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue);
+    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices);
 }
 
 void GLTFTest::SetupDescriptors()
@@ -213,15 +213,6 @@ void GLTFTest::UpdateUniformBuffers()
     mUniforms.mValues.mProj = mCamera.mMatrices.mPerspective;
     mUniforms.mValues.mView = mCamera.mMatrices.mView;
     mUniforms.mValues.mViewPos = mCamera.mViewPos;
-
-    float scale = (1.0f / std::max(mRenderScene.mAABB[0][0], std::max(mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]))) * 0.5f;
-    glm::vec3 translate = -glm::vec3(mRenderScene.mAABB[3][0], mRenderScene.mAABB[3][1], mRenderScene.mAABB[3][2]);
-    translate += -0.5f * glm::vec3(mRenderScene.mAABB[0][0], mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]);
-    mUniforms.mValues.mModel = glm::mat4(1.0f);
-    mUniforms.mValues.mModel[0][0] = scale;
-    mUniforms.mValues.mModel[1][1] = scale;
-    mUniforms.mValues.mModel[2][2] = scale;
-    mUniforms.mValues.mModel = glm::translate(mUniforms.mValues.mModel, translate);
 
     memcpy(mUniforms.mBuffer.mpMapped, &mUniforms.mValues, sizeof(mUniforms.mValues));
 }

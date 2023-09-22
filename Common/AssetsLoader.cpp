@@ -445,7 +445,7 @@ namespace LeoVK
         {
             const tinygltf::Mesh mesh = model.meshes[node.mesh];
             Mesh *newMesh = new Mesh(mpDevice, newNode->mMatrix);
-
+            newMesh->mName = mesh.name;
             for (const auto & primitive : mesh.primitives)
             {
                 auto vertexStart = static_cast<uint32_t>(loaderInfo.mVertexPos);
@@ -635,6 +635,7 @@ namespace LeoVK
                     }
                 }
                 auto * newPrimitive = new Primitive(indexStart, indexCount, vertexCount, primitive.material > -1 ? mMaterials[primitive.material] : mMaterials.back());
+                newPrimitive->mFirstVertex = vertexStart;
                 newPrimitive->SetBoundingBox(posMin, posMax);
                 newMesh->mPrimitives.push_back(newPrimitive);
             }
@@ -1052,6 +1053,7 @@ namespace LeoVK
         const std::string& filename,
         LeoVK::VulkanDevice *device,
         VkQueue transferQueue,
+        uint32_t fileLoadingFlags,
         float scale)
     {
         tinygltf::Model gltfModel;
@@ -1110,14 +1112,50 @@ namespace LeoVK
 
                 // Initial pose
                 if (node->mpMesh) node->Update();
-
             }
         }
         else
         {
             // TODO: throw
-            std::cerr << "Could not load gltf file: " << error << std::endl;
+            LeoVK::VKTools::ExitFatal("Could not load glTF file \"" + filename + "\": " + error, -1);
             return;
+        }
+
+        if ((fileLoadingFlags & FileLoadingFlags::PreTransformVertices) ||
+            (fileLoadingFlags & FileLoadingFlags::PreMultiplyVertexColors) ||
+            (fileLoadingFlags & FileLoadingFlags::FlipY))
+        {
+            const bool preTransform = fileLoadingFlags & FileLoadingFlags::PreTransformVertices;
+            const bool preMultiplyColor = fileLoadingFlags & FileLoadingFlags::PreMultiplyVertexColors;
+            const bool flipY = fileLoadingFlags & FileLoadingFlags::FlipY;
+            for (Node* node : mLinearNodes)
+            {
+                if (node->mpMesh)
+                {
+                    const glm::mat4 localMatrix = node->GetMatrix();
+                    for (Primitive* primitive : node->mpMesh->mPrimitives)
+                    {
+                        for (uint32_t i = 0; i < primitive->mVertexCount; i++)
+                        {
+                            Vertex& vertex = loaderInfo.mpVertexBuffer[primitive->mFirstVertex + i];
+                            if (preTransform)
+                            {
+                                vertex.mPos = glm::vec3(localMatrix * glm::vec4(vertex.mPos, 1.0f));
+                                vertex.mNormal = glm::normalize(glm::mat3(localMatrix) * vertex.mNormal);
+                            }
+                            if (flipY)
+                            {
+                                vertex.mPos.y *= -1.0f;
+                                vertex.mNormal.y *= -1.0f;
+                            }
+                            if (preMultiplyColor)
+                            {
+                                vertex.mColor = primitive->mMaterial.mBaseColorFactor * vertex.mColor;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         mExtensions = gltfModel.extensionsUsed;
@@ -1125,7 +1163,7 @@ namespace LeoVK
         size_t vertexBufferSize = vertexCount * sizeof(Vertex);
         size_t indexBufferSize = indexCount * sizeof(uint32_t);
 
-        assert(vertexBufferSize > 0);
+        assert((vertexBufferSize > 0) && (indexBufferSize > 0));
 
         struct StagingBuffer
         {
