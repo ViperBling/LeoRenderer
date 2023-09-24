@@ -189,7 +189,7 @@ void TestRenderer::UpdateParams()
 
 void TestRenderer::LoadAssets()
 {
-    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices, LeoVK::FileLoadingFlags::FlipY);
+    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices | LeoVK::FileLoadingFlags::FlipY);
 }
 
 void TestRenderer::BuildCommandBuffers()
