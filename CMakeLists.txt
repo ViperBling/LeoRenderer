@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake")
-
 set(NAME LeoRenderer)
 project(${NAME})
 
@@ -62,6 +60,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 file(GLOB SOURCE *.cpp )
+
+find_package(Python)
+function(RunPython TargetName)
+    if (PYTHON_FOUND)
+        add_custom_target(${TargetName} ALL
+            COMMAND 
+               ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/Assets/Shaders/GLSL/CompileGLSL.py
+        )
+    endif()
+endfunction()
+
+RunPython(CompileGLSL)
 
 # Build all examples
 function(buildProjects)

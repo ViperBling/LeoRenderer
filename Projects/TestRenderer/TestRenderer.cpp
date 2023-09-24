@@ -183,7 +183,7 @@ void TestRenderer::UpdateUniformBuffers()
 
 void TestRenderer::UpdateParams()
 {
-    mUBOParams.mLight = glm::vec4(15.0f, -8.0f, 8.0f, 1.0f);
+    mUBOParams.mLight = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     memcpy(mUniformBuffers.mParamsUBO.mpMapped, &mUBOParams, sizeof(mUBOParams));
 }
 
