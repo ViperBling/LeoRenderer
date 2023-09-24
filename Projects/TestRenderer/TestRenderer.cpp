@@ -4,8 +4,8 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     mTitle = "Test Render";
     mCamera.mType = CameraType::LookAt;
-    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -10.0f));
-    mCamera.SetRotation(glm::vec3(-75.0f, 72.0f, 0.0f));
+    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -5.0f));
+    mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
 }
 
@@ -183,7 +183,7 @@ void TestRenderer::UpdateUniformBuffers()
 
 void TestRenderer::UpdateParams()
 {
-    mUBOParams.mLight = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    mUBOParams.mLight = glm::vec4(0.0f, -20.5f, 0.0f, 1.0f);
     memcpy(mUniformBuffers.mParamsUBO.mpMapped, &mUBOParams, sizeof(mUBOParams));
 }
 

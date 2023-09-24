@@ -5,7 +5,7 @@
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
-layout (location = 3) in vec3 inTangent;
+layout (location = 3) in vec4 inTangent;
 
 layout (set = 0, binding = 0) uniform UBOScene
 {
@@ -98,11 +98,11 @@ vec3 F_SchlickR(float cosTheta, vec3 F0, float roughness)
 
 vec3 CalculateNormal()
 {
-    vec3 tangentNormal = texture(samplerNormalMap, inUV).xyz * 2.0 - 1.0;
+    vec3 tangentNormal = texture(samplerNormalMap, inUV).xyz * 2.0 - vec3(1.0);
     
     vec3 N = normalize(inNormal);
-    vec3 T = normalize(inTangent);
-    vec3 B = normalize(cross(N, T));
+    vec3 T = normalize(inTangent.xyz);
+    vec3 B = normalize(cross(N, T) * inTangent.w);
     mat3 TBN = mat3(T, B, N);
 
     return normalize(TBN * tangentNormal);
@@ -135,9 +135,10 @@ vec3 GetDirectionLight(vec3 N, vec3 L, vec3 V, vec3 H, MaterialFactor matFactor,
 
 void main()
 {
-    vec3 N = CalculateNormal();
+    // vec3 N = inTangent.xyz;
+    vec3 N = inNormal;
+    // vec3 N = CalculateNormal();
     vec3 V = normalize(uboScene.camPos - inWorldPos);
-    vec3 R = -normalize(reflect(V, N));
     vec3 L = normalize(uboParams.lightPos.xyz);
     vec3 H = normalize(V + L);
 
@@ -146,8 +147,6 @@ void main()
         matFactor.albedo = ALBEDO;
         matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV).b;
         matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV).g;
-        // matFactor.metalic = 0.5f;
-        // matFactor.roughness = 0.1f;
         matFactor.AO = texture(samplerAOMap, inUV).r;
         matFactor.emissive = texture(samplerEmissiveMap, inUV).rgb;
     }
@@ -168,7 +167,7 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    float ambient = 1000.0f;
+    float ambient = 1.0f;
 
     vec3 color = ambient * GetDirectionLight(N, L, V, H, matFactor, pbrFactor);
 
@@ -176,5 +175,6 @@ void main()
     color = color * (1.0f / UnchartedTonemap(vec3(11.2f)));
     color = pow(color, vec3(1.0f / uboParams.gamma));
 
-    outColor = vec4(color.rgb, 1.0);
+    // outColor = vec4(color.rgb, 1.0);
+    outColor = vec4(N, 1.0);
 }

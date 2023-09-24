@@ -16,17 +16,17 @@ layout (set = 0, binding = 0) uniform UBOScene
 layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV;
-layout (location = 3) out vec3 outTangent;
+layout (location = 3) out vec4 outTangent;
 
 void main()
 {
-    vec3 positionLS = vec3(uboScene.model * vec4(inPos, 1.0));
-    outWorldPos = positionLS;
+    vec3 positionWS = vec3(uboScene.model * vec4(inPos, 1.0));
+    outWorldPos = positionWS;
     outUV = inUV;
 
-    outNormal = mat3(uboScene.model) * inNormal;
-    outTangent = mat3(uboScene.model) * inTangent.xyz;
-    outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
+    outNormal = inNormal;
+    outTangent = inTangent;
+    // outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
 
     gl_Position =  uboScene.projection * uboScene.view * vec4(outWorldPos, 1.0);
 }

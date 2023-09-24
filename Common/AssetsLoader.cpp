@@ -464,6 +464,7 @@ namespace LeoVK
                     const float* bufferTexCoordSet0 = nullptr;
                     const float* bufferTexCoordSet1 = nullptr;
                     const float* bufferColorSet0 = nullptr;
+                    const float *bufferTangents = nullptr;
                     const void * bufferJoints = nullptr;
                     const float* bufferWeights = nullptr;
 
@@ -521,6 +522,13 @@ namespace LeoVK
                         bufferColorSet0 = reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
                         color0ByteStride = accessor.ByteStride(view) ? (accessor.ByteStride(view) / sizeof(float)) : tinygltf::GetNumComponentsInType(TINYGLTF_TYPE_VEC3);
                     }
+                    
+                    if (primitive.attributes.find("TANGENT") != primitive.attributes.end())
+                    {
+                        const tinygltf::Accessor &tangentAccessor = model.accessors[primitive.attributes.find("TANGENT")->second];
+					    const tinygltf::BufferView &tangentView = model.bufferViews[tangentAccessor.bufferView];
+					    bufferTangents = reinterpret_cast<const float *>(&(model.buffers[tangentView.buffer].data[tangentAccessor.byteOffset + tangentView.byteOffset]));
+                    }
 
                     // Skinning
                     // Joints
@@ -551,7 +559,8 @@ namespace LeoVK
                         vert.mUV0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec3(0.0f);
                         vert.mUV1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec3(0.0f);
                         vert.mColor = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : glm::vec4(1.0f);
-
+                        vert.mTangent = bufferTangents ? glm::vec4(glm::make_vec4(&bufferTangents[v * 4])) : glm::vec4(0.0f);
+                        
                         if (hasSkin)
                         {
                             switch (jointComponentType)
