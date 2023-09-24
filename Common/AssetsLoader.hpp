@@ -246,6 +246,7 @@ namespace LeoVK
         void LoadTextures(tinygltf::Model& gltfModel, LeoVK::VulkanDevice* device, VkQueue transferQueue);
         VkSamplerAddressMode GetVkWrapMode(int32_t wrapMode);
         VkFilter GetVkFilterMode(int32_t filterMode);
+        VkDescriptorImageInfo GetTextureDescriptor(const size_t index);
         void LoadTextureSamplers(tinygltf::Model& gltfModel);
         void LoadMaterials(tinygltf::Model& gltfModel);
         void LoadAnimations(tinygltf::Model& gltfModel);

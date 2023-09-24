@@ -1,8 +1,6 @@
 {
-    "C_Cpp.default.compilerPath": "cl.exe",
     "files.associations": {
-        "cstdlib": "cpp",
-        "xstring": "cpp",
+        "vector": "cpp",
         "algorithm": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -18,6 +16,7 @@
         "cstddef": "cpp",
         "cstdint": "cpp",
         "cstdio": "cpp",
+        "cstdlib": "cpp",
         "cstring": "cpp",
         "ctime": "cpp",
         "cwchar": "cpp",
@@ -44,6 +43,8 @@
         "optional": "cpp",
         "ostream": "cpp",
         "ratio": "cpp",
+        "regex": "cpp",
+        "set": "cpp",
         "sstream": "cpp",
         "stdexcept": "cpp",
         "stop_token": "cpp",
@@ -55,9 +56,9 @@
         "type_traits": "cpp",
         "typeinfo": "cpp",
         "unordered_map": "cpp",
+        "unordered_set": "cpp",
         "utility": "cpp",
         "valarray": "cpp",
-        "vector": "cpp",
         "xfacet": "cpp",
         "xhash": "cpp",
         "xiosbase": "cpp",
@@ -69,15 +70,9 @@
         "xlocnum": "cpp",
         "xloctime": "cpp",
         "xmemory": "cpp",
-        "xstddef": "cpp",
+        "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp",
-        "deque": "cpp",
-        "ranges": "cpp",
-        "set": "cpp",
-        "span": "cpp",
-        "stack": "cpp",
-        "unordered_set": "cpp"
+        "xutility": "cpp"
     }
 }

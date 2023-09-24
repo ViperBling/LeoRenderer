@@ -11,8 +11,38 @@
 struct UBOMatrices
 {
     glm::mat4 mProj;
-    glm::mat4 mModelView;
-    glm::mat4 mViewPos;
+    glm::mat4 mModel;
+    glm::mat4 mView;
+    glm::vec3 mCamPos;
+};
+
+struct UBOParams
+{
+    glm::vec4 mLight;
+    float mExposure = 4.5f;
+    float mGamma = 2.2f;
+};
+
+struct PBRPipelines
+{
+    VkPipeline mPBRPipeline;
+};
+
+struct PBRDescSets
+{
+    VkDescriptorSet mObjectDescSet;
+};
+
+struct UBOBuffers
+{
+    LeoVK::Buffer mObjectUBO;
+    LeoVK::Buffer mParamsUBO;
+};
+
+struct DescSetLayouts
+{
+    VkDescriptorSetLayout mUniformDescSetLayout;
+    VkDescriptorSetLayout mTextureDescSetLayout;
 };
 
 class TestRenderer : public VKRendererBase
@@ -21,22 +51,19 @@ public:
     TestRenderer();
     virtual ~TestRenderer();
     void GetEnabledFeatures() override;
-    void SetupRenderPass() override;
     void BuildCommandBuffers() override;
     void Prepare() override;
     void Render() override;
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
 
-    void SetupDescriptorPool();
-    void SetupDescriptorSet();
-    void SetupDescriptorSetLayout();
+    void SetupDescriptors();
     void PreparePipelines();
     void PrepareUniformBuffers();
     void UpdateUniformBuffers();
+    void UpdateParams();
 
     void LoadAssets();
-    void Draw();
 
 public:
     PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR;
@@ -45,11 +72,12 @@ public:
     VkPhysicalDeviceDynamicRenderingFeaturesKHR mDynamicRenderingFeaturesKHR {};
 
     LeoVK::GLTFScene mRenderScene;
-    LeoVK::Buffer mUniformBuffer;
-    UBOMatrices mUniformData;
+    UBOBuffers mUniformBuffers;
+    UBOMatrices mUBOMatrices;
+    UBOParams mUBOParams;
+    PBRPipelines mPipelines;
+    PBRDescSets mDescSets;
 
-    VkPipeline mPipeline;
     VkPipelineLayout mPipelineLayout;
-    VkDescriptorSet mDescSet;
-    VkDescriptorSetLayout mDescSetLayout;
+    DescSetLayouts mDescSetLayout;
 };

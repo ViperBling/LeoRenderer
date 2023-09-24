@@ -751,6 +751,9 @@ namespace LeoVK
             LoadFromImage(&texture, image, texSampler, device, transferQueue);
             mTextures.push_back(texture);
         }
+        LeoVK::Texture2D emptyTex;
+        emptyTex.LoadFromFile(GetAssetsPath() + "Textures/empty.ktx", VK_FORMAT_R8G8B8A8_UNORM, device, transferQueue);
+        mTextures.push_back(emptyTex);
     }
 
     VkSamplerAddressMode GLTFScene::GetVkWrapMode(int32_t wrapMode)
@@ -795,6 +798,11 @@ namespace LeoVK
 
         std::cerr << "Unknown filter mode for getVkFilterMode: " << filterMode << std::endl;
         return VK_FILTER_NEAREST;
+    }
+
+    VkDescriptorImageInfo GLTFScene::GetTextureDescriptor(const size_t index)
+    {
+        return mTextures[index].mDescriptor;
     }
 
     void GLTFScene::LoadTextureSamplers(tinygltf::Model &gltfModel)
