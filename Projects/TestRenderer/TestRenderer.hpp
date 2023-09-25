@@ -41,8 +41,8 @@ struct UBOBuffers
 
 struct DescSetLayouts
 {
-    VkDescriptorSetLayout mUniformDescSetLayout;
-    VkDescriptorSetLayout mTextureDescSetLayout;
+    VkDescriptorSetLayout mUniformDescSetLayout;    // 匹配ObjectDestSet
+    VkDescriptorSetLayout mTextureDescSetLayout;    // 匹配逐Material中的DescSet
 };
 
 class TestRenderer : public VKRendererBase

@@ -4,6 +4,7 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     mTitle = "Test Render";
     mCamera.mType = CameraType::LookAt;
+    mCamera.mbFlipY = true;
     mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -5.0f));
     mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
@@ -183,13 +184,15 @@ void TestRenderer::UpdateUniformBuffers()
 
 void TestRenderer::UpdateParams()
 {
-    mUBOParams.mLight = glm::vec4(0.0f, -20.5f, 0.0f, 1.0f);
+    mUBOParams.mLight = glm::vec4(0.0f, 10.0f, 20.0f, 1.0f);
     memcpy(mUniformBuffers.mParamsUBO.mpMapped, &mUBOParams, sizeof(mUBOParams));
 }
 
 void TestRenderer::LoadAssets()
 {
-    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices | LeoVK::FileLoadingFlags::FlipY);
+    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices);
+    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", mpVulkanDevice, mQueue, LeoVK::FileLoadingFlags::PreTransformVertices | LeoVK::FileLoadingFlags::FlipY);
+    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf", mpVulkanDevice, mQueue);
 }
 
 void TestRenderer::BuildCommandBuffers()
@@ -246,6 +249,7 @@ void TestRenderer::Prepare()
 void TestRenderer::Render()
 {
     RenderFrame();
+    // std::cout << "Camera Position: " << mCamera.mPosition[0] << ", " << mCamera.mPosition[1] << ", " << mCamera.mPosition[2] << std::endl;
     if (mCamera.mbUpdated) UpdateUniformBuffers();
 }
 

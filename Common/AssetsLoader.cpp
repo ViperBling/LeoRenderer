@@ -1159,11 +1159,13 @@ namespace LeoVK
                             {
                                 vertex.mPos = glm::vec3(localMatrix * glm::vec4(vertex.mPos, 1.0f));
                                 vertex.mNormal = glm::normalize(glm::mat3(localMatrix) * vertex.mNormal);
+                                vertex.mTangent = glm::normalize(localMatrix * vertex.mTangent);
                             }
                             if (flipY)
                             {
                                 vertex.mPos.y *= -1.0f;
                                 vertex.mNormal.y *= -1.0f;
+                                vertex.mTangent.y *= -1.0f;
                             }
                             if (preMultiplyColor)
                             {
@@ -1262,6 +1264,8 @@ namespace LeoVK
     {
         if (node->mpMesh)
         {
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1, &node->mpMesh->mUniformBuffer.mDescriptorSet, 0, nullptr);
+
             for (Primitive *primitive : node->mpMesh->mPrimitives)
             {
                 bool skip = false;
