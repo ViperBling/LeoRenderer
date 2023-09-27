@@ -4,8 +4,9 @@
 
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
-layout (location = 2) in vec2 inUV;
-layout (location = 3) in vec4 inTangent;
+layout (location = 2) in vec2 inUV0;
+layout (location = 3) in vec2 inUV1;
+layout (location = 4) in vec4 inTangent;
 
 layout (set = 0, binding = 0) uniform UBOScene
 {
@@ -23,15 +24,15 @@ layout (set = 0, binding = 1) uniform UBOParam
 } uboParams;
 
 layout (set = 1, binding = 0) uniform sampler2D samplerColorMap;
-layout (set = 1, binding = 1) uniform sampler2D samplerNormalMap;
-layout (set = 1, binding = 2) uniform sampler2D samplerMetalicRoughnessMap;
+layout (set = 1, binding = 1) uniform sampler2D samplerMetalicRoughnessMap;
+layout (set = 1, binding = 2) uniform sampler2D samplerNormalMap;
 layout (set = 1, binding = 3) uniform sampler2D samplerAOMap;
 layout (set = 1, binding = 4) uniform sampler2D samplerEmissiveMap;
 
 layout (location = 0) out vec4 outColor;
 
 #define PI 3.1415926535897932384626433832795
-#define ALBEDO pow(texture(samplerColorMap, inUV).rgb, vec3(2.2))
+#define ALBEDO pow(texture(samplerColorMap, inUV0).rgb, vec3(2.2))
 
 struct MaterialFactor
 {
@@ -99,12 +100,12 @@ vec3 F_SchlickR(PBRFactors pbrFactor)
 
 vec3 CalculateNormal()
 {
-    vec3 tangentNormal = texture(samplerNormalMap, inUV).xyz * 2.0 - vec3(1.0);
+    vec3 tangentNormal = texture(samplerNormalMap, inUV0).xyz * 2.0 - vec3(1.0);
 
     vec3 q1 = dFdx(inWorldPos);
     vec3 q2 = dFdy(inWorldPos);
-    vec2 st1 = dFdx(inUV);
-    vec2 st2 = dFdy(inUV);
+    vec2 st1 = dFdx(inUV0);
+    vec2 st2 = dFdy(inUV0);
 
     vec3 N = normalize(inNormal);
     vec3 T = normalize(q1 * st2.t - q2 * st1.t);
@@ -138,8 +139,6 @@ vec3 GetDirectionLight(MaterialFactor matFactor, PBRFactors pbrFactor)
 
 void main()
 {
-    // vec3 N = inTangent.xyz;
-    // vec3 N = inNormal;
     vec3 N = CalculateNormal();
     vec3 V = normalize(uboScene.camPos - inWorldPos);
     vec3 L = normalize(uboParams.lightPos.xyz);
@@ -148,11 +147,13 @@ void main()
     MaterialFactor matFactor;
     {
         matFactor.albedo = ALBEDO;
-        matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV).b;
-        matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV).g;
-        matFactor.AO = texture(samplerAOMap, inUV).r;
-        matFactor.emissive = texture(samplerEmissiveMap, inUV).rgb;
+        matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV0).b;
+        matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV0).g;
+        matFactor.AO = texture(samplerAOMap, inUV0).r;
+        matFactor.emissive = texture(samplerEmissiveMap, inUV0).rgb;
     }
+    vec3 emissive = pow(matFactor.emissive.xyz,vec3(2.2));
+    outColor = vec4(vec3(emissive), 1.0);
     
     PBRFactors pbrFactor;
     {
@@ -175,14 +176,13 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    float ambient = 1.0f;
+    float ambient = 10.0f;
 
-    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor);
+    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor) + matFactor.emissive;
 
     color = UnchartedTonemap(color * uboParams.exposure);
     color = color * (1.0f / UnchartedTonemap(vec3(11.2f)));
     color = pow(color, vec3(1.0f / uboParams.gamma));
 
     outColor = vec4(color.rgb, 1.0);
-    // outColor = vec4(inWorldPos.xyz, 1.0);
 }

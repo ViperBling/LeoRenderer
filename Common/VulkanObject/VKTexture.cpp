@@ -73,8 +73,8 @@ namespace LeoVK
         vkGetBufferMemoryRequirements(mpDevice->mLogicalDevice, stageBuffer, &memReqs);
         memAI.allocationSize = memReqs.size;
         memAI.memoryTypeIndex = mpDevice->GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        VK_CHECK(vkAllocateMemory(mpDevice->mLogicalDevice, &memAI, nullptr, &mDeviceMemory));
-        VK_CHECK(vkBindImageMemory(mpDevice->mLogicalDevice, mImage, mDeviceMemory, 0));
+        VK_CHECK(vkAllocateMemory(mpDevice->mLogicalDevice, &memAI, nullptr, &stageMemory));
+        VK_CHECK(vkBindBufferMemory(mpDevice->mLogicalDevice, stageBuffer, stageMemory, 0));
 
         // Copy texture data into staging buffer
         uint8_t *data;
@@ -221,7 +221,6 @@ namespace LeoVK
 
         // Use a separate command buffer for texture loading
         VkCommandBuffer copyCmd = mpDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-
         
         // Create a host-visible staging buffer that contains the raw image data
         VkBuffer stagingBuffer;

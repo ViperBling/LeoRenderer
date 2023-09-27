@@ -761,7 +761,9 @@ namespace LeoVK
             mTextures.push_back(texture);
         }
         LeoVK::Texture2D emptyTex;
-        emptyTex.LoadFromFile(GetAssetsPath() + "Textures/empty.ktx", VK_FORMAT_R8G8B8A8_UNORM, device, transferQueue);
+        std::vector<char> emptyVal = {0, 0, 0, 0};
+        emptyTex.LoadFromBuffer(emptyVal.data(), sizeof(emptyVal), VK_FORMAT_R8G8B8A8_UNORM, 1, 1, device, transferQueue);
+        // emptyTex.LoadFromFile(GetAssetsPath() + "Textures/empty.ktx", VK_FORMAT_R8G8B8A8_UNORM, device, transferQueue);
         mTextures.push_back(emptyTex);
     }
 

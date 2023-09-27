@@ -243,8 +243,8 @@ void VulkanRenderer::UpdateParams()
 
 void VulkanRenderer::LoadAssets()
 {
-    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue);
-    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", mpVulkanDevice, mQueue);
+    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue);
+    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", mpVulkanDevice, mQueue);
     // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf", mpVulkanDevice, mQueue);
 }
 

@@ -29,7 +29,8 @@ layout (set = 2, binding = 0) uniform UBONode
 layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV0;
-layout (location = 3) out vec4 outTangent;
+layout (location = 3) out vec2 outUV1;
+layout (location = 4) out vec4 outTangent;
 
 void main()
 {
@@ -59,6 +60,6 @@ void main()
     vec3 positionWS = vec3(uboScene.model * vec4(inPos, 1.0));
     outWorldPos = locPos.xyz / locPos.w;
     outUV0 = inUV0;
-
+    outUV1 = inUV1;
     gl_Position =  uboScene.projection * uboScene.view * vec4(outWorldPos, 1.0);
 }
