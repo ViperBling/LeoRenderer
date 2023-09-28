@@ -81,7 +81,10 @@ namespace LeoVK
             bool mbMetallicRoughness = true;
             bool mbSpecularGlossiness = false;
         } mPBRWorkFlows;
-        VkDescriptorSet mDescriptorSet{};
+        VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
+        int mIndex = 0;
+        bool mbUnlit = false;
+        float mEmissiveStrength = 1.0f;
     };
 
     struct Dimensions

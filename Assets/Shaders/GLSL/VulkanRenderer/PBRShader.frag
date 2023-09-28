@@ -108,8 +108,8 @@ vec3 CalculateNormal()
     vec2 st2 = dFdy(inUV0);
 
     vec3 N = normalize(inNormal);
-    vec3 T = normalize(q1 * st2.t - q2 * st1.t);
-    // vec3 T = normalize(inTangent.xyz);
+    // vec3 T = normalize(q1 * st2.t - q2 * st1.t);
+    vec3 T = normalize(inTangent.xyz);
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 
@@ -118,7 +118,7 @@ vec3 CalculateNormal()
 
 vec3 GetDirectionLight(MaterialFactor matFactor, PBRFactors pbrFactor)
 {
-    vec3 radiance = vec3(1.0) * 1.0f;
+    vec3 radiance = vec3(1.0) * 10.0f;
 
     vec3 F = F_Schlick(pbrFactor);
     float D = D_GGX(pbrFactor);
@@ -152,8 +152,6 @@ void main()
         matFactor.AO = texture(samplerAOMap, inUV0).r;
         matFactor.emissive = texture(samplerEmissiveMap, inUV0).rgb;
     }
-    vec3 emissive = pow(matFactor.emissive.xyz,vec3(2.2));
-    outColor = vec4(vec3(emissive), 1.0);
     
     PBRFactors pbrFactor;
     {
@@ -176,9 +174,9 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    float ambient = 10.0f;
+    float ambient = 1.0f;
 
-    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor) + matFactor.emissive;
+    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor);
 
     color = UnchartedTonemap(color * uboParams.exposure);
     color = color * (1.0f / UnchartedTonemap(vec3(11.2f)));

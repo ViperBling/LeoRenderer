@@ -4,8 +4,9 @@
 
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
-layout (location = 2) in vec2 inUV;
-layout (location = 3) in vec4 inTangent;
+layout (location = 2) in vec2 inUV0;
+layout (location = 3) in vec2 inUV1;
+layout (location = 4) in vec4 inTangent;
 
 layout (set = 0, binding = 0) uniform UBOScene
 {
@@ -23,15 +24,15 @@ layout (set = 0, binding = 1) uniform UBOParam
 } uboParams;
 
 layout (set = 1, binding = 0) uniform sampler2D samplerColorMap;
-layout (set = 1, binding = 1) uniform sampler2D samplerNormalMap;
-layout (set = 1, binding = 2) uniform sampler2D samplerMetalicRoughnessMap;
+layout (set = 1, binding = 1) uniform sampler2D samplerMetalicRoughnessMap;
+layout (set = 1, binding = 2) uniform sampler2D samplerNormalMap;
 layout (set = 1, binding = 3) uniform sampler2D samplerAOMap;
 layout (set = 1, binding = 4) uniform sampler2D samplerEmissiveMap;
 
 layout (location = 0) out vec4 outColor;
 
 #define PI 3.1415926535897932384626433832795
-#define ALBEDO pow(texture(samplerColorMap, inUV).rgb, vec3(2.2))
+#define ALBEDO pow(texture(samplerColorMap, inUV0).rgb, vec3(2.2))
 
 struct MaterialFactor
 {
@@ -48,6 +49,7 @@ struct PBRFactors
     float NoV;
     float NoH;
     float VoH;
+    float LoH;
     float perceptualRoughness;
     float alphaRoughness;
     vec3 diffuseColor;
@@ -67,12 +69,12 @@ vec3 UnchartedTonemap(vec3 x)
     return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
 }
 
-float D_GGX(float NoH, float roughness)
+float D_GGX(PBRFactors pbrFactor)
 {
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float denom = NoH * NoH * (alpha2 - 1.0) + 1.0;
-    return (alpha2) / (PI * denom * denom); 
+    float alpha = pbrFactor.alphaRoughness * pbrFactor.alphaRoughness;
+    // float alpha2 = alpha * alpha;
+    float denom = pbrFactor.NoH * pbrFactor.NoH * (alpha - 1.0) + 1.0;
+    return (alpha) / (PI * denom * denom); 
 }
 
 float G_SchlicksmithGGX(PBRFactors pbrFactor)
@@ -88,36 +90,38 @@ float G_SchlicksmithGGX(PBRFactors pbrFactor)
 
 vec3 F_Schlick(PBRFactors pbrFactor)
 {
-    return pbrFactor.reflectance0 + (pbrFactor.reflectance90 - pbrFactor.reflectance0) * pow(1.0 - pbrFactor.VoH, 5.0);
+    return pbrFactor.reflectance0 + (pbrFactor.reflectance90 - pbrFactor.reflectance0) * pow(clamp(1.0 - pbrFactor.VoH, 0.0, 1.0), 5.0);
 }
 
-vec3 F_SchlickR(float cosTheta, vec3 F0, float roughness)
+vec3 F_SchlickR(PBRFactors pbrFactor)
 {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+    return pbrFactor.reflectance0 + (max(vec3(1.0 - pbrFactor.alphaRoughness), pbrFactor.reflectance0) - pbrFactor.reflectance0) * pow(1.0 - pbrFactor.VoH, 5.0);
 }
 
 vec3 CalculateNormal()
 {
-    vec3 tangentNormal = texture(samplerNormalMap, inUV).xyz * 2.0 - vec3(1.0);
-    
+    vec3 tangentNormal = texture(samplerNormalMap, inUV0).xyz * 2.0 - vec3(1.0);
+
+    vec3 q1 = dFdx(inWorldPos);
+    vec3 q2 = dFdy(inWorldPos);
+    vec2 st1 = dFdx(inUV0);
+    vec2 st2 = dFdy(inUV0);
+
     vec3 N = normalize(inNormal);
+    // vec3 T = normalize(q1 * st2.t - q2 * st1.t);
     vec3 T = normalize(inTangent.xyz);
-    vec3 B = normalize(cross(N, T) * inTangent.w);
+    vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 
     return normalize(TBN * tangentNormal);
 }
 
-vec3 GetDirectionLight(vec3 N, vec3 L, vec3 V, vec3 H, MaterialFactor matFactor, PBRFactors pbrFactor)
+vec3 GetDirectionLight(MaterialFactor matFactor, PBRFactors pbrFactor)
 {
-    pbrFactor.NoL = max(dot(N, L), 0.001);
-    pbrFactor.NoH = max(dot(N, H), 0.001);
-    pbrFactor.VoH = max(dot(H, V), 0.001);
-
-    vec3 radiance = vec3(1.0) * 50.0f;
+    vec3 radiance = vec3(1.0) * 10.0f;
 
     vec3 F = F_Schlick(pbrFactor);
-    float D = D_GGX(pbrFactor.NoH, matFactor.roughness);
+    float D = D_GGX(pbrFactor);
     float G = G_SchlicksmithGGX(pbrFactor);
 
     vec3 kS = F;
@@ -135,26 +139,30 @@ vec3 GetDirectionLight(vec3 N, vec3 L, vec3 V, vec3 H, MaterialFactor matFactor,
 
 void main()
 {
-    // vec3 N = inTangent.xyz;
-    vec3 N = inNormal;
-    // vec3 N = CalculateNormal();
+    vec3 N = CalculateNormal();
     vec3 V = normalize(uboScene.camPos - inWorldPos);
     vec3 L = normalize(uboParams.lightPos.xyz);
-    vec3 H = normalize(V + L);
+    vec3 H = normalize(L + V);
 
     MaterialFactor matFactor;
     {
         matFactor.albedo = ALBEDO;
-        matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV).b;
-        matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV).g;
-        matFactor.AO = texture(samplerAOMap, inUV).r;
-        matFactor.emissive = texture(samplerEmissiveMap, inUV).rgb;
+        matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV0).b;
+        matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV0).g;
+        matFactor.AO = texture(samplerAOMap, inUV0).r;
+        matFactor.emissive = texture(samplerEmissiveMap, inUV0).rgb;
     }
+    // outColor = vec4(vec3(matFactor.metalic), 1.0);
     
     PBRFactors pbrFactor;
     {
         float F0 = 0.04;
-        pbrFactor.NoV = max(dot(N, V), 0.001);
+        pbrFactor.NoL = clamp(dot(N, L), 0.001, 1.0);
+        pbrFactor.NoV = clamp(abs(dot(N, V)), 0.001, 1.0);
+        pbrFactor.NoH = clamp(dot(N, H), 0.0, 1.0);
+        pbrFactor.LoH = clamp(dot(L, H), 0.0, 1.0);
+        pbrFactor.VoH = clamp(dot(V, H), 0.0, 1.0);
+
         pbrFactor.diffuseColor = matFactor.albedo.rgb * (1.0 - F0);
         pbrFactor.diffuseColor *= 1.0 - matFactor.metalic;
         pbrFactor.specularColor = mix(vec3(F0), matFactor.albedo, matFactor.metalic);
@@ -162,19 +170,18 @@ void main()
         pbrFactor.perceptualRoughness = clamp(matFactor.roughness, 0.04, 1.0);
         pbrFactor.alphaRoughness = pbrFactor.perceptualRoughness * pbrFactor.perceptualRoughness;
 
-        float reflectance = max(max(pbrFactor.specularColor.r, pbrFactor.specularColor.g), pbrFactor.specularColor.g);
+        float reflectance = max(max(pbrFactor.specularColor.r, pbrFactor.specularColor.g), pbrFactor.specularColor.b);
         pbrFactor.reflectance0 = pbrFactor.specularColor.rgb;
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
     float ambient = 1.0f;
 
-    vec3 color = ambient * GetDirectionLight(N, L, V, H, matFactor, pbrFactor);
+    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor);
 
-    color = UnchartedTonemap(color * uboParams.exposure) * matFactor.AO;
+    color = UnchartedTonemap(color * uboParams.exposure);
     color = color * (1.0f / UnchartedTonemap(vec3(11.2f)));
     color = pow(color, vec3(1.0f / uboParams.gamma));
 
-    // outColor = vec4(color.rgb, 1.0);
-    outColor = vec4(N, 1.0);
+    outColor = vec4(color.rgb, 1.0);
 }

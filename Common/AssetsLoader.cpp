@@ -834,7 +834,7 @@ namespace LeoVK
     {
         for (tinygltf::Material &mat : gltfModel.materials)
         {
-            LeoVK::Material material{};
+            LeoVK::Material material;
             material.mbDoubleSided = mat.doubleSided;
 
             if (mat.values.find("baseColorTexture") != mat.values.end())
@@ -933,6 +933,21 @@ namespace LeoVK
                     }
                 }
             }
+            if (mat.extensions.find("KHR_materials_unlit") != mat.extensions.end())
+            {
+                material.mbUnlit = true;
+            }
+
+            if (mat.extensions.find("KHR_materials_emissive_strength") != mat.extensions.end()) 
+            {
+                auto ext = mat.extensions.find("KHR_materials_emissive_strength");
+                if (ext->second.Has("emissiveStrength")) 
+                {
+                    auto value = ext->second.Get("emissiveStrength");
+                    material.mEmissiveStrength = (float)value.Get<double>();
+                }
+            }
+            material.mIndex = static_cast<uint32_t>(mMaterials.size());
             mMaterials.push_back(material);
         }
         // Push a default material at the end of the list for meshes with no material assigned

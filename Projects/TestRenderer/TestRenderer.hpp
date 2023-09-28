@@ -23,10 +23,7 @@ struct UBOParams
     float mGamma = 2.2f;
 };
 
-struct PBRPipelines
-{
-    VkPipeline mPBRPipeline;
-};
+typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
 
 struct PBRDescSets
 {
@@ -42,7 +39,8 @@ struct UBOBuffers
 struct DescSetLayouts
 {
     VkDescriptorSetLayout mUniformDescSetLayout;    // 匹配ObjectDestSet
-    VkDescriptorSetLayout mTextureDescSetLayout;    // 匹配逐Material中的DescSet
+    VkDescriptorSetLayout mTextureDescSetLayout;    // 匹配Material中的DescSet
+    VkDescriptorSetLayout mNodeDescSetLayout;       // 匹配Mesh中的Uniform DescSet
 };
 
 class TestRenderer : public VKRendererBase
@@ -58,24 +56,24 @@ public:
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
 
     void SetupDescriptors();
+    void SetupNodeDescriptors(LeoVK::Node* node);
+    void AddPipelineSet(const std::string prefix, const std::string vertexShader, const std::string pixelShader);
     void PreparePipelines();
     void PrepareUniformBuffers();
     void UpdateUniformBuffers();
     void UpdateParams();
 
     void LoadAssets();
+    void DrawNode(LeoVK::Node* node, uint32_t cbIndex, LeoVK::Material::AlphaMode alphaMode);
 
 public:
-    PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR;
-    PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR;
-
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR mDynamicRenderingFeaturesKHR {};
 
     LeoVK::GLTFScene mRenderScene;
     UBOBuffers mUniformBuffers;
     UBOMatrices mUBOMatrices;
     UBOParams mUBOParams;
     PBRPipelines mPipelines;
+    VkPipeline mBoundPipeline = VK_NULL_HANDLE;
     PBRDescSets mDescSets;
 
     VkPipelineLayout mPipelineLayout;
