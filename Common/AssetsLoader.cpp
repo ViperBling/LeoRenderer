@@ -767,6 +767,73 @@ namespace LeoVK
         mTextures.push_back(emptyTex);
     }
 
+    void GLTFScene::LoadMaterialBuffer(LeoVK::Buffer &matParamsBuffer, VkQueue queue)
+    {
+        std::vector<MaterialShaderParams> materialParams{};
+        for (auto& mat : mMaterials)
+        {
+            MaterialShaderParams matShaderParam{};
+
+            matShaderParam.mEmissiveFactor = mat.mEmissiveFactor;
+            matShaderParam.mColorTextureSet = mat.mpBaseColorTexture != nullptr ? mat.mTexCoordSets.mBaseColor : -1;
+            matShaderParam.mNormalTextureSet = mat.mpNormalTexture != nullptr ? mat.mTexCoordSets.mNormal : -1;
+            matShaderParam.mOcclusionTextureSet = mat.mpOcclusionTexture != nullptr ? mat.mTexCoordSets.mOcclusion : -1;
+            matShaderParam.mEmissiveTextureSet = mat.mpEmissiveTexture != nullptr ? mat.mTexCoordSets.mEmissive : -1;
+            matShaderParam.mAlphaMask = static_cast<float>(mat.mAlphaMode == LeoVK::Material::ALPHA_MODE_MASK);
+            matShaderParam.mAlphaMaskCutOff = mat.mAlphaCutoff;
+            matShaderParam.mEmissiveStrength = mat.mEmissiveStrength;
+
+            if (mat.mPBRWorkFlows.mbMetallicRoughness)
+            {
+                matShaderParam.mWorkFlow = static_cast<float>(PBR_WORKFLOW_METALLIC_ROUGHNESS);
+                matShaderParam.mBaseColorFactor = mat.mBaseColorFactor;
+                matShaderParam.mMetalicFactor = mat.mMetallicFactor;
+                matShaderParam.mRoughnessFactor = mat.mRoughnessFactor;
+                matShaderParam.mPhysicalDescTextureSet = mat.mpMetallicRoughnessTexture != nullptr ? mat.mTexCoordSets.mMetallicRoughness : -1;
+                matShaderParam.mColorTextureSet = mat.mpBaseColorTexture != nullptr ? mat.mTexCoordSets.mBaseColor : -1;
+            }
+            if (mat.mPBRWorkFlows.mbSpecularGlossiness)
+            {
+                matShaderParam.mWorkFlow = static_cast<float>(PBR_WORKFLOW_SPECULAR_GLOSINESS);
+                matShaderParam.mPhysicalDescTextureSet = mat.mExtension.mpSpecularGlossinessTexture != nullptr ? mat.mTexCoordSets.mSpecularGlossiness : -1;
+                matShaderParam.mColorTextureSet = mat.mExtension.mpDiffuseTexture != nullptr ? mat.mTexCoordSets.mBaseColor : -1;
+                matShaderParam.mDiffuseFactor = mat.mExtension.mDiffuseFactor;
+                matShaderParam.mSpecularFactor = glm::vec4(mat.mExtension.mSpecularFactor, 1.0f);
+            }
+
+            materialParams.push_back(matShaderParam);
+        }
+
+        if (matParamsBuffer.mBuffer != VK_NULL_HANDLE) matParamsBuffer.Destroy();
+
+        VkDeviceSize bufferSize = materialParams.size() * sizeof(MaterialShaderParams);
+        LeoVK::Buffer stagingBuffer;
+        VK_CHECK(mpDevice->CreateBuffer(
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+            bufferSize, 
+            &stagingBuffer.mBuffer, &stagingBuffer.mMemory, 
+            materialParams.data()))
+        VK_CHECK(mpDevice->CreateBuffer(
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+            bufferSize, 
+            &matParamsBuffer.mBuffer, &matParamsBuffer.mMemory))
+
+        VkCommandBuffer copyCmd = mpDevice->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+        VkBufferCopy copyRegion{};
+        copyRegion.size = bufferSize;
+        vkCmdCopyBuffer(copyCmd, stagingBuffer.mBuffer, matParamsBuffer.mBuffer, 1, &copyRegion);
+        mpDevice->FlushCommandBuffer(copyCmd, queue, true);
+        stagingBuffer.mDevice = mpDevice->mLogicalDevice;
+        stagingBuffer.Destroy();
+
+        matParamsBuffer.mDescriptor.buffer = matParamsBuffer.mBuffer;
+        matParamsBuffer.mDescriptor.offset = 0;
+        matParamsBuffer.mDescriptor.range = bufferSize;
+        matParamsBuffer.mDevice = mpDevice->mLogicalDevice;
+    }
+
     VkSamplerAddressMode GLTFScene::GetVkWrapMode(int32_t wrapMode)
     {
         switch (wrapMode)

@@ -24,9 +24,11 @@ TestRenderer::~TestRenderer()
         vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mUniformDescSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mTextureDescSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mNodeDescSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mMaterialBufferDescSetLayout, nullptr);
 
         mUniformBuffers.mObjectUBO.Destroy();
         mUniformBuffers.mParamsUBO.Destroy();
+        mUniformBuffers.mMaterialParamsBuffer.Destroy();
 
         mRenderScene.Destroy(mDevice);
     }
@@ -57,10 +59,11 @@ void TestRenderer::SetupDescriptors()
     // 两种类型的DescSet，分别创建DescSetPool。UniformBuffer两个，TexSampler根据Material中的贴图数量创建
     std::vector<VkDescriptorPoolSize> poolSize = {
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uniformCount + meshCount),
-        LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount)
+        LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount),
+        LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
     };
-    const uint32_t maxSetCount = static_cast<uint32_t>(mRenderScene.mTextures.size()) + meshCount;
-    VkDescriptorPoolCreateInfo descSetPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount + 1);
+    const uint32_t maxSetCount = static_cast<uint32_t>(mRenderScene.mTextures.size()) + meshCount + 2;
+    VkDescriptorPoolCreateInfo descSetPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descSetPoolCI, nullptr, &mDescPool));
 
     // UniformBuffer的DescSetLayout
@@ -122,6 +125,22 @@ void TestRenderer::SetupDescriptors()
 	{
 		SetupNodeDescriptors(node);
 	}
+
+
+    // Material Buffer Descriptor
+    {
+        std::vector<VkDescriptorSetLayoutBinding> matDescSetLayoutBinding = {
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+        };
+        VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(matDescSetLayoutBinding);
+        VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mMaterialBufferDescSetLayout))
+
+        VkDescriptorSetAllocateInfo matDescSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mMaterialBufferDescSetLayout, 1);
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &matDescSetAI, &mDescSets.mMaterialParamsDescSet))
+
+        VkWriteDescriptorSet matWriteDescSet = LeoVK::Init::WriteDescriptorSet(mDescSets.mMaterialParamsDescSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &mUniformBuffers.mMaterialParamsBuffer.mDescriptor);
+        vkUpdateDescriptorSets(mDevice, 1, &matWriteDescSet, 0, nullptr);
+    }
 }
 
 void TestRenderer::SetupNodeDescriptors(LeoVK::Node* node)
@@ -210,10 +229,15 @@ void TestRenderer::PreparePipelines()
     // 确定pipelineLayout
     std::array<VkDescriptorSetLayout, 3> descSetLayouts = { mDescSetLayout.mUniformDescSetLayout, mDescSetLayout.mTextureDescSetLayout, mDescSetLayout.mNodeDescSetLayout };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(descSetLayouts.data(), static_cast<uint32_t>(descSetLayouts.size()));
+    VkPushConstantRange pushConstRange{};
+    pushConstRange.size = sizeof(uint32_t);
+    pushConstRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pipelineLayoutCI.pushConstantRangeCount = 1;
+    pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout));
 
-    AddPipelineSet("PBR", "TestRenderer/PBRShader.vert.spv", "TestRenderer/PBRShader.frag.spv");
-    AddPipelineSet("Unlit", "TestRenderer/PBRShader.vert.spv", "TestRenderer/PBRUnlit.frag.spv");
+    AddPipelineSet("PBR", "TestRenderer/TestPBRShader.vert.spv", "TestRenderer/TestPBRShader.frag.spv");
+    AddPipelineSet("Unlit", "TestRenderer/TestPBRShader.vert.spv", "TestRenderer/TestPBRUnlit.frag.spv");
 }
 
 void TestRenderer::PrepareUniformBuffers()
@@ -279,9 +303,24 @@ void TestRenderer::UpdateParams()
     memcpy(mUniformBuffers.mParamsUBO.mpMapped, &mUBOParams, sizeof(mUBOParams));
 }
 
+void TestRenderer::LoadScene(std::string filename)
+{
+    std::cout << "Loading scen from: " << filename << std::endl;
+    mRenderScene.Destroy(mDevice);
+    mAnimIndex = 0;
+    mAnimTimer = 0.0f;
+    auto tStart = std::chrono::high_resolution_clock::now();
+    mRenderScene.LoadFromFile(filename, mpVulkanDevice, mQueue);
+    mRenderScene.LoadMaterialBuffer(mUniformBuffers.mMaterialParamsBuffer, mQueue);
+    auto tFileLoad = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - tStart).count();
+    std::cout << "Loading took " << tFileLoad << " ms" << std::endl;
+    mCamera.SetPosition({ 0.0f, 0.0f, 1.0f });
+    mCamera.SetRotation({ 0.0f, 0.0f, 0.0f });
+}
+
 void TestRenderer::LoadAssets()
 {
-    mRenderScene.LoadFromFile(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf", mpVulkanDevice, mQueue);
+    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", mpVulkanDevice, mQueue);
     // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf", mpVulkanDevice, mQueue);
 }
@@ -325,7 +364,7 @@ void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Materia
                     node->mpMesh->mUniformBuffer.mDescriptorSet
                 };
                 vkCmdBindDescriptorSets(mDrawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
-
+                vkCmdPushConstants(mDrawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &primitive->mMaterial.mIndex);
                 vkCmdDrawIndexed(mDrawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
             }
         }

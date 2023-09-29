@@ -36,6 +36,8 @@ namespace LeoVK
         BoundingBox(glm::vec3 min, glm::vec3 max);
         BoundingBox GetAABB(glm::mat4 mat);
     };
+    
+    enum PBRWorkflows{ PBR_WORKFLOW_METALLIC_ROUGHNESS = 0, PBR_WORKFLOW_SPECULAR_GLOSINESS = 1 };
 
     struct Material
     {
@@ -59,6 +61,9 @@ namespace LeoVK
         Texture*    mpNormalTexture = nullptr;
         Texture*    mpOcclusionTexture = nullptr;
         Texture*    mpEmissiveTexture = nullptr;
+        int mIndex = 0;
+        bool mbUnlit = false;
+        float mEmissiveStrength = 1.0f;
 
         struct TexCoordSets
         {
@@ -82,9 +87,25 @@ namespace LeoVK
             bool mbSpecularGlossiness = false;
         } mPBRWorkFlows;
         VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
-        int mIndex = 0;
-        bool mbUnlit = false;
-        float mEmissiveStrength = 1.0f;
+    };
+
+    struct alignas(16) MaterialShaderParams
+    {
+        glm::vec4 mBaseColorFactor;
+        glm::vec4 mEmissiveFactor;
+        glm::vec4 mDiffuseFactor;
+        glm::vec4 mSpecularFactor;
+        float mWorkFlow;
+        int mColorTextureSet;
+        int mPhysicalDescTextureSet;
+        int mNormalTextureSet;
+        int mOcclusionTextureSet;
+        int mEmissiveTextureSet;
+        float mMetalicFactor;
+        float mRoughnessFactor;
+        float mAlphaMask;
+        float mAlphaMaskCutOff;
+        float mEmissiveStrength;
     };
 
     struct Dimensions
@@ -247,6 +268,7 @@ namespace LeoVK
         void GetNodeProperty(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
         void LoadSkins(tinygltf::Model& gltfModel);
         void LoadTextures(tinygltf::Model& gltfModel, LeoVK::VulkanDevice* device, VkQueue transferQueue);
+        void LoadMaterialBuffer(LeoVK::Buffer& matParamsBuffer, VkQueue queue);
         VkSamplerAddressMode GetVkWrapMode(int32_t wrapMode);
         VkFilter GetVkFilterMode(int32_t filterMode);
         VkDescriptorImageInfo GetTextureDescriptor(const size_t index);

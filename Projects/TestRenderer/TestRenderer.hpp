@@ -28,12 +28,14 @@ typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
 struct PBRDescSets
 {
     VkDescriptorSet mObjectDescSet;
+    VkDescriptorSet mMaterialParamsDescSet;
 };
 
 struct UBOBuffers
 {
     LeoVK::Buffer mObjectUBO;
     LeoVK::Buffer mParamsUBO;
+    LeoVK::Buffer mMaterialParamsBuffer;
 };
 
 struct DescSetLayouts
@@ -41,6 +43,7 @@ struct DescSetLayouts
     VkDescriptorSetLayout mUniformDescSetLayout;    // 匹配ObjectDestSet
     VkDescriptorSetLayout mTextureDescSetLayout;    // 匹配Material中的DescSet
     VkDescriptorSetLayout mNodeDescSetLayout;       // 匹配Mesh中的Uniform DescSet
+    VkDescriptorSetLayout mMaterialBufferDescSetLayout;
 };
 
 class TestRenderer : public VKRendererBase
@@ -63,6 +66,7 @@ public:
     void UpdateUniformBuffers();
     void UpdateParams();
 
+    void LoadScene(std::string filename);
     void LoadAssets();
     void DrawNode(LeoVK::Node* node, uint32_t cbIndex, LeoVK::Material::AlphaMode alphaMode);
 
@@ -72,10 +76,15 @@ public:
     UBOBuffers mUniformBuffers;
     UBOMatrices mUBOMatrices;
     UBOParams mUBOParams;
+
     PBRPipelines mPipelines;
     VkPipeline mBoundPipeline = VK_NULL_HANDLE;
     PBRDescSets mDescSets;
 
     VkPipelineLayout mPipelineLayout;
     DescSetLayouts mDescSetLayout;
+
+    int32_t mAnimIndex = 0;
+    float mAnimTimer = 0.0f;
+    bool mbAnimate = true;
 };
