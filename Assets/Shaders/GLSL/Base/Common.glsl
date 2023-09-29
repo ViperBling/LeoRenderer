@@ -1,5 +1,7 @@
 #define PI 3.1415926535897932384626433832795
-#define ALBEDO pow(texture(samplerColorMap, inUV0).rgb, vec3(2.2))
+const float c_MinRoughness = 0.04;
+const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
+const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
 
 struct ShaderMaterial 
 {
@@ -22,7 +24,8 @@ struct ShaderMaterial
 
 struct MaterialFactor
 {
-    vec3 albedo;
+    vec4 albedo;
+    vec3 diffuseColor;
     float metalic;
     float roughness;
     vec3 emissive;
@@ -38,6 +41,7 @@ struct PBRFactors
     float LoH;
     float perceptualRoughness;
     float alphaRoughness;
+    float metalness;
     vec3 diffuseColor;
     vec3 specularColor;
     vec3 reflectance0;
@@ -53,6 +57,38 @@ vec3 UnchartedTonemap(vec3 x)
     float E = 0.02;
     float F = 0.30;
     return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+vec4 SRGBtoLINEAR(vec4 srgbIn)
+{
+#define MANUAL_SRGB 1
+#ifdef MANUAL_SRGB
+	#ifdef SRGB_FAST_APPROXIMATION
+	    vec3 linOut = pow(srgbIn.xyz,vec3(2.2));
+	#else //SRGB_FAST_APPROXIMATION
+	    vec3 bLess = step(vec3(0.0392, 0.0392, 0.0392),srgbIn.xyz);
+	    vec3 linOut = mix( srgbIn.xyz/vec3(12.92), pow((srgbIn.xyz+vec3(0.055))/vec3(1.055),vec3(2.4)), bLess );
+	#endif //SRGB_FAST_APPROXIMATION
+	return vec4(linOut,srgbIn.w);;
+#else //MANUAL_SRGB
+	return srgbIn;
+#endif //MANUAL_SRGB
+}
+
+// Gets metallic factor from specular glossiness workflow inputs 
+float ConvertMetallic(vec3 diffuse, vec3 specular, float maxSpecular)
+{
+    float perceivedDiffuse = sqrt(0.299 * diffuse.r * diffuse.r + 0.587 * diffuse.g * diffuse.g + 0.114 * diffuse.b * diffuse.b);
+    float perceivedSpecular = sqrt(0.299 * specular.r * specular.r + 0.587 * specular.g * specular.g + 0.114 * specular.b * specular.b);
+    if (perceivedSpecular < c_MinRoughness) 
+    {
+        return 0.0;
+    }
+    float a = c_MinRoughness;
+    float b = perceivedDiffuse * (1.0 - maxSpecular) / (1.0 - c_MinRoughness) + perceivedSpecular - 2.0 * c_MinRoughness;
+    float c = c_MinRoughness - perceivedSpecular;
+    float D = max(b * b - 4.0 * a * c, 0.0);
+    return clamp((-b + sqrt(D)) / (2.0 * a), 0.0, 1.0);
 }
 
 float D_GGX(PBRFactors pbrFactor)
@@ -84,18 +120,16 @@ vec3 F_SchlickR(PBRFactors pbrFactor)
     return pbrFactor.reflectance0 + (max(vec3(1.0 - pbrFactor.alphaRoughness), pbrFactor.reflectance0) - pbrFactor.reflectance0) * pow(1.0 - pbrFactor.VoH, 5.0);
 }
 
-vec3 CalculateNormal()
+vec3 CalculateNormal(vec3 tangentNormal, vec3 inWorldPos, vec3 inNormal, vec2 inUV)
 {
-    vec3 tangentNormal = texture(samplerNormalMap, inUV0).xyz * 2.0 - vec3(1.0);
-
     vec3 q1 = dFdx(inWorldPos);
     vec3 q2 = dFdy(inWorldPos);
-    vec2 st1 = dFdx(inUV0);
-    vec2 st2 = dFdy(inUV0);
+    vec2 st1 = dFdx(inUV);
+    vec2 st2 = dFdy(inUV);
 
     vec3 N = normalize(inNormal);
-    // vec3 T = normalize(q1 * st2.t - q2 * st1.t);
-    vec3 T = normalize(inTangent.xyz);
+    vec3 T = normalize(q1 * st2.t - q2 * st1.t);
+    // vec3 T = normalize(inTangent.xyz);
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 

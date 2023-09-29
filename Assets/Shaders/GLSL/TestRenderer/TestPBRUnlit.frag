@@ -2,6 +2,8 @@
 
 #extension GL_GOOGLE_include_directive : enable
 
+#include "../Base/Common.glsl"
+
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV0;
@@ -23,6 +25,16 @@ layout (set = 0, binding = 1) uniform UBOParam
     float gamma;
 } uboParams;
 
+layout(std430, set = 3, binding = 0) buffer SSBO
+{
+   ShaderMaterial materials[ ];
+};
+
+layout (push_constant) uniform PushConstants 
+{
+    int materialIndex;
+} pushConstants;
+
 layout (set = 1, binding = 0) uniform sampler2D samplerColorMap;
 layout (set = 1, binding = 1) uniform sampler2D samplerMetalicRoughnessMap;
 layout (set = 1, binding = 2) uniform sampler2D samplerNormalMap;
@@ -36,5 +48,17 @@ layout (location = 0) out vec4 outColor;
 
 void main()
 {
-    outColor = vec4(vec3(1.0), 1.0f);
+    ShaderMaterial material = materials[pushConstants.materialIndex];
+
+    vec4 baseColor;
+
+    if (material.baseColorTextureSet > -1) 
+    {
+        baseColor = SRGBtoLINEAR(texture(samplerColorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
+    } else 
+    {
+        baseColor = material.baseColorFactor;
+    }
+
+    outColor = baseColor;
 }

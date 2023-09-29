@@ -5,7 +5,7 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
     mTitle = "Test Render";
     mCamera.mType = CameraType::LookAt;
     mCamera.mbFlipY = true;
-    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -5.0f));
+    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
     // mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
 }
@@ -126,7 +126,6 @@ void TestRenderer::SetupDescriptors()
 		SetupNodeDescriptors(node);
 	}
 
-
     // Material Buffer Descriptor
     {
         std::vector<VkDescriptorSetLayoutBinding> matDescSetLayoutBinding = {
@@ -227,7 +226,7 @@ void TestRenderer::AddPipelineSet(const std::string prefix, const std::string ve
 void TestRenderer::PreparePipelines()
 {
     // 确定pipelineLayout
-    std::array<VkDescriptorSetLayout, 3> descSetLayouts = { mDescSetLayout.mUniformDescSetLayout, mDescSetLayout.mTextureDescSetLayout, mDescSetLayout.mNodeDescSetLayout };
+    std::array<VkDescriptorSetLayout, 4> descSetLayouts = { mDescSetLayout.mUniformDescSetLayout, mDescSetLayout.mTextureDescSetLayout, mDescSetLayout.mNodeDescSetLayout, mDescSetLayout.mMaterialBufferDescSetLayout };
     VkPipelineLayoutCreateInfo pipelineLayoutCI = LeoVK::Init::PipelineLayoutCreateInfo(descSetLayouts.data(), static_cast<uint32_t>(descSetLayouts.size()));
     VkPushConstantRange pushConstRange{};
     pushConstRange.size = sizeof(uint32_t);
@@ -272,10 +271,10 @@ void TestRenderer::UpdateUniformBuffers()
     glm::vec3 translate = -glm::vec3(mRenderScene.mAABB[3][0], mRenderScene.mAABB[3][1], mRenderScene.mAABB[3][2]);
     translate += -0.5f * glm::vec3(mRenderScene.mAABB[0][0], mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]);
     mUBOMatrices.mModel = glm::mat4(1.0f);
-    // mUBOMatrices.mModel[0][0] = scale;
-    // mUBOMatrices.mModel[1][1] = scale;
-    // mUBOMatrices.mModel[2][2] = scale;
-    // mUBOMatrices.mModel = glm::translate(mUBOMatrices.mModel, translate);
+    mUBOMatrices.mModel[0][0] = scale;
+    mUBOMatrices.mModel[1][1] = scale;
+    mUBOMatrices.mModel[2][2] = scale;
+    mUBOMatrices.mModel = glm::translate(mUBOMatrices.mModel, translate);
 
     // mUBOMatrices.mCamPos = mCamera.mPosition;
 
@@ -292,7 +291,7 @@ void TestRenderer::UpdateParams()
 {
     struct LightSource {
         glm::vec3 color = glm::vec3(1.0f);
-        glm::vec3 rotation = glm::vec3(75.0f, 40.0f, 0.0f);
+        glm::vec3 rotation = glm::vec3(75.0f, 40.0f, 10.0f);
     } lightSource;
 
     mUBOParams.mLight = glm::vec4(
@@ -321,8 +320,8 @@ void TestRenderer::LoadScene(std::string filename)
 void TestRenderer::LoadAssets()
 {
     LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
-    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", mpVulkanDevice, mQueue);
-    // mRenderScene.LoadFromFile(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf", mpVulkanDevice, mQueue);
+    // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
+    // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -361,7 +360,8 @@ void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Materia
                 const std::vector<VkDescriptorSet> descSets = {
                     mDescSets.mObjectDescSet,
                     primitive->mMaterial.mDescriptorSet,
-                    node->mpMesh->mUniformBuffer.mDescriptorSet
+                    node->mpMesh->mUniformBuffer.mDescriptorSet,
+                    mDescSets.mMaterialParamsDescSet
                 };
                 vkCmdBindDescriptorSets(mDrawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
                 vkCmdPushConstants(mDrawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &primitive->mMaterial.mIndex);
@@ -463,14 +463,7 @@ void TestRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 {
     if (overlay->Header("Settings")) 
     {
-        if (overlay->SliderFloat("Exposure", &mUBOParams.mExposure, 0.1f, 10)) 
-        {
-            UpdateParams();
-        }
-        if (overlay->SliderFloat("Gamma", &mUBOParams.mGamma, 0.1f, 3)) 
-        {
-            UpdateParams();
-        }
+        
     }
 }
 

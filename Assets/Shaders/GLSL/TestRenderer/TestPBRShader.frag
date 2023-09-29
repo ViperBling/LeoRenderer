@@ -2,6 +2,8 @@
 
 #extension GL_GOOGLE_include_directive : require
 
+#include "../Base/Common.glsl"
+
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV0;
@@ -31,27 +33,98 @@ layout (set = 1, binding = 4) uniform sampler2D samplerEmissiveMap;
 
 layout (location = 0) out vec4 outColor;
 
-#include "../Base/Common.glsl"
-
 layout (std430, set = 3, binding = 0) buffer SSBO
 {
     ShaderMaterial materials[];
 };
 
+layout (push_constant) uniform PushConstants 
+{
+	int materialIndex;
+} pushConstants;
+
 void main()
 {
-    vec3 N = CalculateNormal();
+    ShaderMaterial material = materials[pushConstants.materialIndex];
+
+    vec3 N = (material.normalTextureSet > -1) ? CalculateNormal(texture(samplerNormalMap, inUV0).xyz * 2.0 - vec3(1.0), inWorldPos, inNormal, inUV0) : normalize(inNormal);
     vec3 V = normalize(uboScene.camPos - inWorldPos);
     vec3 L = normalize(uboParams.lightPos.xyz);
     vec3 H = normalize(L + V);
-
+    
     MaterialFactor matFactor;
     {
-        matFactor.albedo = ALBEDO;
-        matFactor.metalic = texture(samplerMetalicRoughnessMap, inUV0).b;
-        matFactor.roughness = texture(samplerMetalicRoughnessMap, inUV0).g;
-        matFactor.AO = texture(samplerAOMap, inUV0).r;
-        matFactor.emissive = texture(samplerEmissiveMap, inUV0).rgb;
+        if (material.alphaMask == 1.0f) 
+        {
+            if (material.baseColorTextureSet > -1) 
+            {
+                matFactor.albedo = SRGBtoLINEAR(texture(samplerColorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
+            } 
+            else 
+            {
+                matFactor.albedo = material.baseColorFactor;
+            }
+            
+            if (matFactor.albedo.a < material.alphaMaskCutoff) 
+            {
+                discard;
+            }
+        }
+        
+        if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS)
+        {
+            matFactor.roughness = material.roughnessFactor;
+            matFactor.metalic = material.metallicFactor;
+            if (material.physicalDescriptorTextureSet > -1) 
+            {
+                // Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
+                // This layout intentionally reserves the 'r' channel for (optional) occlusion map data
+                vec4 mrSample = texture(samplerMetalicRoughnessMap, material.physicalDescriptorTextureSet == 0 ? inUV0 : inUV1);
+                matFactor.roughness *= mrSample.g;
+                matFactor.metalic *= mrSample.b;
+            } 
+            else 
+            {
+                matFactor.roughness = clamp(matFactor.roughness, c_MinRoughness, 1.0);
+                matFactor.metalic = clamp(matFactor.metalic, 0.0, 1.0);
+            }
+            // Roughness is authored as perceptual roughness; as is convention,
+            // convert to material roughness by squaring the perceptual roughness [2].
+            // The albedo may be defined from a base texture or a flat color
+            if (material.baseColorTextureSet > -1) 
+            {
+                matFactor.albedo = SRGBtoLINEAR(texture(samplerColorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
+            } else {
+                matFactor.albedo = material.baseColorFactor;
+            }
+        }
+
+        if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSINESS) 
+        {
+            // Values from specular glossiness workflow are converted to metallic roughness
+            if (material.physicalDescriptorTextureSet > -1) 
+            {
+                matFactor.roughness = 1.0 - texture(samplerMetalicRoughnessMap, material.physicalDescriptorTextureSet == 0 ? inUV0 : inUV1).a;
+            } 
+            else 
+            {
+            	matFactor.roughness = 0.0;
+            }
+        
+            const float epsilon = 1e-6;
+        
+            vec4 diffuse = SRGBtoLINEAR(texture(samplerColorMap, inUV0));
+            vec3 specular = SRGBtoLINEAR(texture(samplerMetalicRoughnessMap, inUV0)).rgb;
+        
+            float maxSpecular = max(max(specular.r, specular.g), specular.b);
+        
+            // Convert metallic value from specular glossiness inputs
+            matFactor.metalic = ConvertMetallic(diffuse.rgb, specular, maxSpecular);
+        
+            vec3 baseColorDiffusePart = diffuse.rgb * ((1.0 - maxSpecular) / (1 - c_MinRoughness) / max(1 - matFactor.metalic, epsilon)) * material.diffuseFactor.rgb;
+            vec3 baseColorSpecularPart = specular - (vec3(c_MinRoughness) * (1 - matFactor.metalic) * (1 / max(matFactor.metalic, epsilon))) * material.specularFactor.rgb;
+            matFactor.albedo = vec4(mix(baseColorDiffusePart, baseColorSpecularPart, matFactor.metalic * matFactor.metalic), diffuse.a);
+        }
     }
     
     PBRFactors pbrFactor;
@@ -65,10 +138,10 @@ void main()
 
         pbrFactor.diffuseColor = matFactor.albedo.rgb * (1.0 - F0);
         pbrFactor.diffuseColor *= 1.0 - matFactor.metalic;
-        pbrFactor.specularColor = mix(vec3(F0), matFactor.albedo, matFactor.metalic);
+        pbrFactor.specularColor = mix(vec3(F0), matFactor.albedo.rgb, matFactor.metalic);
         
-        pbrFactor.perceptualRoughness = clamp(matFactor.roughness, 0.04, 1.0);
-        pbrFactor.alphaRoughness = pbrFactor.perceptualRoughness * pbrFactor.perceptualRoughness;
+        // pbrFactor.perceptualRoughness = clamp(matFactor.roughness, 0.04, 1.0);
+        pbrFactor.alphaRoughness = matFactor.roughness * matFactor.roughness;
 
         float reflectance = max(max(pbrFactor.specularColor.r, pbrFactor.specularColor.g), pbrFactor.specularColor.b);
         pbrFactor.reflectance0 = pbrFactor.specularColor.rgb;
@@ -77,11 +150,23 @@ void main()
 
     float ambient = 1.0f;
 
-    vec3 color = ambient * matFactor.AO * GetDirectionLight(matFactor, pbrFactor) + matFactor.emissive;
+    vec3 color = GetDirectionLight(matFactor, pbrFactor);
 
-    color = UnchartedTonemap(color * uboParams.exposure);
-    color = color * (1.0f / UnchartedTonemap(vec3(11.2f)));
-    color = pow(color, vec3(1.0f / uboParams.gamma));
+    const float u_OcclusionStrength = 1.0f;
+    // Apply optional PBR terms for additional (optional) shading
+    if (material.occlusionTextureSet > -1) 
+    {
+        float ao = texture(samplerAOMap, (material.occlusionTextureSet == 0 ? inUV0 : inUV1)).r;
+        color = mix(color, color * ao, u_OcclusionStrength);
+    }
+
+    vec3 emissive = vec3(0.0f);
+    if (material.emissiveTextureSet > -1) 
+    {
+        emissive = material.emissiveFactor.rgb * material.emissiveStrength;
+        emissive *= SRGBtoLINEAR(texture(samplerEmissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1)).rgb;
+    };
+    color += emissive;
 
     outColor = vec4(color.rgb, 1.0);
 }
