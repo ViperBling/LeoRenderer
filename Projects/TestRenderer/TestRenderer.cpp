@@ -5,8 +5,8 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
     mTitle = "Test Render";
     mCamera.mType = CameraType::LookAt;
     mCamera.mbFlipY = true;
-    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
-    // mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -1.0f));
+    mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
 }
 
@@ -162,7 +162,7 @@ void TestRenderer::AddPipelineSet(const std::string prefix, const std::string ve
 {
     VkPipelineInputAssemblyStateCreateInfo iaStateCI = LeoVK::Init::PipelineIAStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
     VkPipelineRasterizationStateCreateInfo rsStateCI = LeoVK::Init::PipelineRSStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
-    VkPipelineColorBlendAttachmentState cbAttachCI = LeoVK::Init::PipelineCBAState(0xf, VK_FALSE);
+    VkPipelineColorBlendAttachmentState cbAttachCI = LeoVK::Init::PipelineCBAState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
     VkPipelineColorBlendStateCreateInfo cbStateCI = LeoVK::Init::PipelineCBStateCreateInfo(1, &cbAttachCI);
     VkPipelineDepthStencilStateCreateInfo dsStateCI = LeoVK::Init::PipelineDSStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
     VkPipelineViewportStateCreateInfo vpStateCI = LeoVK::Init::PipelineVPStateCreateInfo(1, 1, 0);
@@ -289,9 +289,10 @@ void TestRenderer::UpdateUniformBuffers()
 
 void TestRenderer::UpdateParams()
 {
-    struct LightSource {
+    struct LightSource 
+    {
         glm::vec3 color = glm::vec3(1.0f);
-        glm::vec3 rotation = glm::vec3(75.0f, 40.0f, 10.0f);
+        glm::vec3 rotation = glm::vec3(90.0f, 40.0f, 45.0f);
     } lightSource;
 
     mUBOParams.mLight = glm::vec4(
@@ -313,15 +314,15 @@ void TestRenderer::LoadScene(std::string filename)
     mRenderScene.LoadMaterialBuffer(mUniformBuffers.mMaterialParamsBuffer, mQueue);
     auto tFileLoad = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - tStart).count();
     std::cout << "Loading took " << tFileLoad << " ms" << std::endl;
-    mCamera.SetPosition({ 0.0f, 0.0f, 1.0f });
+    mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -0.5f));
     mCamera.SetRotation({ 0.0f, 0.0f, 0.0f });
 }
 
 void TestRenderer::LoadAssets()
 {
-    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
-    // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -365,7 +366,14 @@ void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Materia
                 };
                 vkCmdBindDescriptorSets(mDrawCmdBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
                 vkCmdPushConstants(mDrawCmdBuffers[cbIndex], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &primitive->mMaterial.mIndex);
-                vkCmdDrawIndexed(mDrawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                if (primitive->mbHasIndices)
+                {
+                    vkCmdDrawIndexed(mDrawCmdBuffers[cbIndex], primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
+                }
+                else
+                {
+                    vkCmdDraw(mDrawCmdBuffers[cbIndex], primitive->mVertexCount, 1, 0, 0);
+                }
             }
         }
     }
@@ -415,15 +423,15 @@ void TestRenderer::BuildCommandBuffers()
         vkCmdBindIndexBuffer(mDrawCmdBuffers[i], mRenderScene.mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         mBoundPipeline = VK_NULL_HANDLE;
-        for (auto node : mRenderScene.mNodes)
+        for (auto& node : mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_OPAQUE);
         }
-        for (auto node : mRenderScene.mNodes)
+        for (auto& node : mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_MASK);
         }
-        for (auto node : mRenderScene.mNodes)
+        for (auto& node : mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_BLEND);
         }

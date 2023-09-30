@@ -12,12 +12,12 @@ struct ShaderMaterial
     float workflow;
     int baseColorTextureSet;
     int physicalDescriptorTextureSet;
-    int normalTextureSet;	
+    int normalTextureSet;
     int occlusionTextureSet;
     int emissiveTextureSet;
-    float metallicFactor;	
-    float roughnessFactor;	
-    float alphaMask;	
+    float metallicFactor;
+    float roughnessFactor;
+    float alphaMask;
     float alphaMaskCutoff;
     float emissiveStrength;
 };
@@ -136,9 +136,9 @@ vec3 CalculateNormal(vec3 tangentNormal, vec3 inWorldPos, vec3 inNormal, vec2 in
     return normalize(TBN * tangentNormal);
 }
 
-vec3 GetDirectionLight(MaterialFactor matFactor, PBRFactors pbrFactor)
+vec3 GetDirectionLight(vec3 lightColor, MaterialFactor matFactor, PBRFactors pbrFactor)
 {
-    vec3 radiance = vec3(1.0) * 10.0f;
+    vec3 radiance = lightColor;
 
     vec3 F = F_Schlick(pbrFactor);
     float D = D_GGX(pbrFactor);

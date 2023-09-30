@@ -148,12 +148,9 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    float ambient = 1.0f;
-
-    vec3 color = GetDirectionLight(matFactor, pbrFactor);
+    vec3 color = GetDirectionLight(vec3(10.0f), matFactor, pbrFactor);
 
     const float u_OcclusionStrength = 1.0f;
-    // Apply optional PBR terms for additional (optional) shading
     if (material.occlusionTextureSet > -1) 
     {
         float ao = texture(samplerAOMap, (material.occlusionTextureSet == 0 ? inUV0 : inUV1)).r;
@@ -168,5 +165,6 @@ void main()
     };
     color += emissive;
 
-    outColor = vec4(color.rgb, 1.0);
+    outColor = vec4(color.rgb, matFactor.albedo.a);
+    // outColor = vec4(vec3(matFactor.metalic), 1.0);
 }

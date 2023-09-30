@@ -153,7 +153,7 @@ namespace LeoVK
         struct UniformBlock
         {
             glm::mat4 mMatrix;
-            glm::mat4 mJointMatrix[64]{};
+            glm::mat4 mJointMatrix[128]{};
             float     mJointCount{};
         } mUniformBlock;
 

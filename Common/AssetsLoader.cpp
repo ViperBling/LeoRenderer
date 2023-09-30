@@ -1018,7 +1018,7 @@ namespace LeoVK
             mMaterials.push_back(material);
         }
         // Push a default material at the end of the list for meshes with no material assigned
-        mMaterials.emplace_back();
+        mMaterials.push_back(Material());
     }
 
     void GLTFScene::LoadAnimations(tinygltf::Model &gltfModel)
