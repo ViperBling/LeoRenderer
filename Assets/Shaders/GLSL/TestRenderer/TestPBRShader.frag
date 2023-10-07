@@ -9,6 +9,7 @@ layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV0;
 layout (location = 3) in vec2 inUV1;
 layout (location = 4) in vec4 inTangent;
+layout (location = 5) in vec4 inColor;
 
 layout (set = 0, binding = 0) uniform UBOScene
 {
@@ -48,10 +49,10 @@ void main()
     ShaderMaterial material = materials[pushConstants.materialIndex];
 
     vec3 N = (material.normalTextureSet > -1) ? CalculateNormal(texture(samplerNormalMap, inUV0).xyz * 2.0 - vec3(1.0), inWorldPos, inNormal, inUV0) : normalize(inNormal);
-    vec3 V = normalize(uboScene.camPos - inWorldPos);
+    vec3 V = normalize(inWorldPos - uboScene.camPos);
     vec3 L = normalize(uboParams.lightPos.xyz);
     vec3 H = normalize(L + V);
-    
+
     MaterialFactor matFactor;
     {
         if (material.alphaMask == 1.0f) 
@@ -94,7 +95,9 @@ void main()
             if (material.baseColorTextureSet > -1) 
             {
                 matFactor.albedo = SRGBtoLINEAR(texture(samplerColorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
-            } else {
+            } 
+            else 
+            {
                 matFactor.albedo = material.baseColorFactor;
             }
         }
@@ -129,16 +132,16 @@ void main()
     
     PBRFactors pbrFactor;
     {
-        float F0 = 0.04;
+        vec3 F0 = vec3(0.04);
         pbrFactor.NoL = clamp(dot(N, L), 0.001, 1.0);
         pbrFactor.NoV = clamp(abs(dot(N, V)), 0.001, 1.0);
         pbrFactor.NoH = clamp(dot(N, H), 0.0, 1.0);
         pbrFactor.LoH = clamp(dot(L, H), 0.0, 1.0);
         pbrFactor.VoH = clamp(dot(V, H), 0.0, 1.0);
 
-        pbrFactor.diffuseColor = matFactor.albedo.rgb * (1.0 - F0);
+        pbrFactor.diffuseColor = matFactor.albedo.rgb * (vec3(1.0) - F0);
         pbrFactor.diffuseColor *= 1.0 - matFactor.metalic;
-        pbrFactor.specularColor = mix(vec3(F0), matFactor.albedo.rgb, matFactor.metalic);
+        pbrFactor.specularColor = mix(F0, matFactor.albedo.rgb, matFactor.metalic);
         
         // pbrFactor.perceptualRoughness = clamp(matFactor.roughness, 0.04, 1.0);
         pbrFactor.alphaRoughness = matFactor.roughness * matFactor.roughness;
@@ -148,7 +151,7 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    vec3 color = GetDirectionLight(vec3(10.0f), matFactor, pbrFactor);
+    vec3 color = GetDirectionLight(vec3(1.0f), matFactor, pbrFactor);
 
     const float u_OcclusionStrength = 1.0f;
     if (material.occlusionTextureSet > -1) 
@@ -165,6 +168,7 @@ void main()
     };
     color += emissive;
 
+    color = pow(vec3(color), vec3(0.4545));
     outColor = vec4(color.rgb, matFactor.albedo.a);
-    // outColor = vec4(vec3(matFactor.metalic), 1.0);
+    // outColor = vec4(vec3(matFactor.metalic), matFactor.albedo.a);
 }

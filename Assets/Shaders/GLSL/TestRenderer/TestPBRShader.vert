@@ -31,6 +31,7 @@ layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV0;
 layout (location = 3) out vec2 outUV1;
 layout (location = 4) out vec4 outTangent;
+layout (location = 5) out vec4 outColor;
 
 void main()
 {
@@ -56,10 +57,11 @@ void main()
     outTangent = inTangent;
     // outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
 
-    // locPos.y = -locPos.y;
+    locPos.y = -locPos.y;
     vec3 positionWS = vec3(uboScene.model * vec4(inPos, 1.0));
     outWorldPos = locPos.xyz / locPos.w;
     outUV0 = inUV0;
     outUV1 = inUV1;
+    outColor = inColor;
     gl_Position =  uboScene.projection * uboScene.view * vec4(outWorldPos, 1.0);
 }

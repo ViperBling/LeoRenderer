@@ -4,7 +4,7 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
 {
     mTitle = "Test Render";
     mCamera.mType = CameraType::LookAt;
-    mCamera.mbFlipY = true;
+    // mCamera.mbFlipY = true;
     mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -1.0f));
     mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
@@ -276,8 +276,6 @@ void TestRenderer::UpdateUniformBuffers()
     mUBOMatrices.mModel[2][2] = scale;
     mUBOMatrices.mModel = glm::translate(mUBOMatrices.mModel, translate);
 
-    // mUBOMatrices.mCamPos = mCamera.mPosition;
-
     mUBOMatrices.mCamPos = glm::vec3(
         -mCamera.mPosition.z * sin(glm::radians(mCamera.mRotation.y)) * cos(glm::radians(mCamera.mRotation.x)),
         -mCamera.mPosition.z * sin(glm::radians(mCamera.mRotation.x)),
@@ -292,7 +290,7 @@ void TestRenderer::UpdateParams()
     struct LightSource 
     {
         glm::vec3 color = glm::vec3(1.0f);
-        glm::vec3 rotation = glm::vec3(90.0f, 40.0f, 45.0f);
+        glm::vec3 rotation = glm::vec3(75.0f, 40.0f, 0.0f);
     } lightSource;
 
     mUBOParams.mLight = glm::vec4(
@@ -320,9 +318,9 @@ void TestRenderer::LoadScene(std::string filename)
 
 void TestRenderer::LoadAssets()
 {
-    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
-    LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
+    // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -460,6 +458,15 @@ void TestRenderer::Render()
     RenderFrame();
     // std::cout << "Camera Position: " << mCamera.mPosition[0] << ", " << mCamera.mPosition[1] << ", " << mCamera.mPosition[2] << std::endl;
     if (mCamera.mbUpdated) UpdateUniformBuffers();
+    if (mbAnimate && !mRenderScene.mAnimations.empty())
+    {
+        mAnimTimer += mFrameTimer * mAnimateSpeed;
+        if (mAnimTimer > mRenderScene.mAnimations[mAnimIndex].mEnd)
+        {
+            mAnimTimer -= mRenderScene.mAnimations[mAnimIndex].mEnd;
+        }
+        mRenderScene.UpdateAnimation(mAnimIndex, mAnimTimer);
+    }
 }
 
 void TestRenderer::ViewChanged()
@@ -471,7 +478,14 @@ void TestRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 {
     if (overlay->Header("Settings")) 
     {
-        
+        if (!mRenderScene.mAnimations.empty())
+        {
+            if (overlay->Header("Animations"))
+            {
+                overlay->CheckBox("Animate", &mbAnimate);
+                overlay->SliderFloat("Animation Speed", &mAnimateSpeed, 0.00001, 10);
+            }
+        }
     }
 }
 
