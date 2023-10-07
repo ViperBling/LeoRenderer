@@ -9,7 +9,7 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
     mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.001f, 256.0f);
     mCamera.SetMovementSpeed(0.5f);
-    mCamera.SetRotationSpeed(0.5f);
+    mCamera.SetRotationSpeed(0.3f);
 }
 
 TestRenderer::~TestRenderer()
@@ -321,9 +321,9 @@ void TestRenderer::LoadScene(std::string filename)
 void TestRenderer::LoadAssets()
 {
     // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
-    // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
-    LoadScene(GetAssetsPath() + "Models/Sponza/Sponza.gltf");
+    // LoadScene(GetAssetsPath() + "Models/Sponza/Sponza.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -487,6 +487,14 @@ void TestRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
             {
                 overlay->CheckBox("Animate", &mbAnimate);
                 overlay->SliderFloat("Animation Speed", &mAnimateSpeed, 0.00001, 10);
+            }
+        }
+        const std::vector<std::string> camType = {"LookAt", "FirstPerson"};
+        if (overlay->Header("Camera Settings"))
+        {
+            if (overlay->ComboBox("CameraType", &mCamTypeIndex, camType))
+            {
+                mCamera.mType = static_cast<CameraType>(mCamTypeIndex);
             }
         }
     }

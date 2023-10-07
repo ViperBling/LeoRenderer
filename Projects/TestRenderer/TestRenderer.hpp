@@ -87,5 +87,7 @@ public:
     int32_t mAnimIndex = 0;
     float mAnimTimer = 0.0f;
     bool mbAnimate = true;
-    float mAnimateSpeed = 1.0f;
+    float mAnimateSpeed = 1.5f;
+
+    int32_t mCamTypeIndex = 0;
 };
