@@ -31,6 +31,8 @@ public:
     bool Moving() const { return mKeys.mLeft || mKeys.mRight || mKeys.mUp || mKeys.mDown; }
     float GetNearClip() const { return mZNear; }
     float GetFarClip() const { return mZFar; }
+    void SetNearClip(float nearClip) { mZNear = nearClip; }
+    void SetFarClip(float farClip) { mZFar = farClip; }
     void SetPosition(glm::vec3 position) { mPosition = position; updateViewMatrix(); }
     void SetRotation(glm::vec3 rotation) { mRotation = rotation; updateViewMatrix(); }
     void Rotate(glm::vec3 delta) { mRotation += delta; updateViewMatrix(); }
@@ -64,5 +66,4 @@ private:
     float mFov;
     float mZNear;
     float mZFar;
-
 };

@@ -7,7 +7,9 @@ TestRenderer::TestRenderer() : VKRendererBase(ENABLE_MSAA, ENABLE_VALIDATION)
     // mCamera.mbFlipY = true;
     mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -1.0f));
     mCamera.SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
-    mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.1f, 256.0f);
+    mCamera.SetPerspective(60.0f, (float)mWidth / (float)mHeight, 0.001f, 256.0f);
+    mCamera.SetMovementSpeed(0.5f);
+    mCamera.SetRotationSpeed(0.5f);
 }
 
 TestRenderer::~TestRenderer()
@@ -318,9 +320,10 @@ void TestRenderer::LoadScene(std::string filename)
 
 void TestRenderer::LoadAssets()
 {
-    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/Sponza/Sponza.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
