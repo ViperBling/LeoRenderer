@@ -101,12 +101,22 @@ void TestRenderer::SetupDescriptors()
         const VkDescriptorSetAllocateInfo texDescAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mTextureDescSetLayout, 1);
         VK_CHECK(vkAllocateDescriptorSets(mDevice, &texDescAI, &mat.mDescriptorSet));
         std::vector<VkDescriptorImageInfo> imageDescs = {
-            mat.mpBaseColorTexture ? mat.mpBaseColorTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
-            mat.mpMetallicRoughnessTexture ? mat.mpMetallicRoughnessTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
+            mRenderScene.mTextures.back().mDescriptor,
+            mRenderScene.mTextures.back().mDescriptor,
             mat.mpNormalTexture ? mat.mpNormalTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
             mat.mpOcclusionTexture ? mat.mpOcclusionTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
             mat.mpEmissiveTexture ? mat.mpEmissiveTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor
         };
+        if (mat.mPBRWorkFlows.mbMetallicRoughness)
+        {
+            if (mat.mpBaseColorTexture) imageDescs[0] = mat.mpBaseColorTexture->mDescriptor;
+            if (mat.mpMetallicRoughnessTexture) imageDescs[1] = mat.mpMetallicRoughnessTexture->mDescriptor;
+        }
+        if (mat.mPBRWorkFlows.mbSpecularGlossiness)
+        {
+            if (mat.mExtension.mpDiffuseTexture) imageDescs[0] = mat.mExtension.mpDiffuseTexture->mDescriptor;
+            if (mat.mExtension.mpSpecularGlossinessTexture) imageDescs[1] = mat.mExtension.mpSpecularGlossinessTexture->mDescriptor;
+        }
         std::vector<VkWriteDescriptorSet> texWriteDescSet = {
             LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &imageDescs[0]),
             LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageDescs[1]),
@@ -117,14 +127,17 @@ void TestRenderer::SetupDescriptors()
         vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(texWriteDescSet.size()), texWriteDescSet.data(), 0, nullptr);
     }
 
-    std::vector<VkDescriptorSetLayoutBinding> nodeDescSetLayoutBinding = {
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
-    };
-    VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(nodeDescSetLayoutBinding);
-    VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mNodeDescSetLayout));
-    for (auto & node : mRenderScene.mNodes)
+    // Node Desc Set
     {
-        SetupNodeDescriptors(node);
+        std::vector<VkDescriptorSetLayoutBinding> nodeDescSetLayoutBinding = {
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
+        };
+        VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(nodeDescSetLayoutBinding);
+        VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mNodeDescSetLayout));
+        for (auto & node : mRenderScene.mNodes)
+        {
+            SetupNodeDescriptors(node);
+        }
     }
 
     // Material Buffer Descriptor
@@ -148,7 +161,7 @@ void TestRenderer::SetupNodeDescriptors(LeoVK::Node* node)
     if (node->mpMesh)
     {
         VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mNodeDescSetLayout, 1);
-        VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &node->mpMesh->mUniformBuffer.mDescriptorSet));
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &node->mpMesh->mUniformBuffer.mDescriptorSet))
 
         VkWriteDescriptorSet writeDescSet = LeoVK::Init::WriteDescriptorSet(node->mpMesh->mUniformBuffer.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &node->mpMesh->mUniformBuffer.mDescriptor);
         vkUpdateDescriptorSets(mDevice, 1, &writeDescSet, 0, nullptr);
@@ -319,12 +332,16 @@ void TestRenderer::LoadScene(std::string filename)
 
 void TestRenderer::LoadAssets()
 {
-    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
     // LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/TransmissionTest/glTF/TransmissionTest.gltf");
+    // LoadScene(GetAssetsPath() + "Models/KnightArtorias/scene.gltf");
+    // LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
+    // LoadScene(GetAssetsPath() + "Models/CyberSamurai/scene.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)

@@ -151,7 +151,7 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    vec3 color = GetDirectionLight(vec3(1.0f), matFactor, pbrFactor);
+    vec3 color = GetDirectionLight(vec3(10.0f), matFactor, pbrFactor);
 
     const float u_OcclusionStrength = 1.0f;
     if (material.occlusionTextureSet > -1) 

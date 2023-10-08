@@ -23,20 +23,19 @@ struct UBOParams
     float mGamma = 2.2f;
 };
 
-struct PBRPipelines
-{
-    VkPipeline mPBRPipeline;
-};
+typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
 
 struct PBRDescSets
 {
     VkDescriptorSet mObjectDescSet;
+    VkDescriptorSet mMaterialParamsDescSet;
 };
 
 struct UBOBuffers
 {
     LeoVK::Buffer mObjectUBO;
     LeoVK::Buffer mParamsUBO;
+    LeoVK::Buffer mMaterialParamsBuffer;
 };
 
 struct DescSetLayouts
@@ -44,6 +43,7 @@ struct DescSetLayouts
     VkDescriptorSetLayout mUniformDescSetLayout;    // 匹配ObjectDestSet
     VkDescriptorSetLayout mTextureDescSetLayout;    // 匹配Material中的DescSet
     VkDescriptorSetLayout mNodeDescSetLayout;       // 匹配Mesh中的Uniform DescSet
+    VkDescriptorSetLayout mMaterialBufferDescSetLayout;
 };
 
 class VulkanRenderer : public VKRendererBase
@@ -60,27 +60,34 @@ public:
 
     void SetupDescriptors();
     void SetupNodeDescriptors(LeoVK::Node* node);
+    void AddPipelineSet(const std::string prefix, const std::string vertexShader, const std::string pixelShader);
     void PreparePipelines();
     void PrepareUniformBuffers();
     void UpdateUniformBuffers();
     void UpdateParams();
 
+    void LoadScene(std::string filename);
     void LoadAssets();
+    void DrawNode(LeoVK::Node* node, uint32_t cbIndex, LeoVK::Material::AlphaMode alphaMode);
 
 public:
-    PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR;
-    PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR;
-
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR mDynamicRenderingFeaturesKHR {};
 
     LeoVK::GLTFScene mRenderScene;
     UBOBuffers mUniformBuffers;
     UBOMatrices mUBOMatrices;
     UBOParams mUBOParams;
+
     PBRPipelines mPipelines;
     VkPipeline mBoundPipeline = VK_NULL_HANDLE;
     PBRDescSets mDescSets;
 
     VkPipelineLayout mPipelineLayout;
     DescSetLayouts mDescSetLayout;
+
+    int32_t mAnimIndex = 0;
+    float mAnimTimer = 0.0f;
+    bool mbAnimate = true;
+    float mAnimateSpeed = 1.5f;
+
+    int32_t mCamTypeIndex = 0;
 };

@@ -464,7 +464,7 @@ namespace LeoVK
                     const float* bufferTexCoordSet0 = nullptr;
                     const float* bufferTexCoordSet1 = nullptr;
                     const float* bufferColorSet0 = nullptr;
-                    const float *bufferTangents = nullptr;
+                    const float* bufferTangents = nullptr;
                     const void * bufferJoints = nullptr;
                     const float* bufferWeights = nullptr;
 
