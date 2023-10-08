@@ -86,6 +86,9 @@ public:
     void UpdateUniformBuffers();
     void UpdateParams();
 
+    void GenerateBRDFLUT();
+    void GenerateCubeMaps();
+
     void LoadScene(std::string filename);
     void LoadAssets();
     void DrawNode(LeoVK::Node* node, uint32_t cbIndex, LeoVK::Material::AlphaMode alphaMode);

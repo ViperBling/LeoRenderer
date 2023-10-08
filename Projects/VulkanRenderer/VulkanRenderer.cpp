@@ -33,10 +33,10 @@ VulkanRenderer::~VulkanRenderer()
         mUniformBuffers.mSkyboxUBO.Destroy();
         mUniformBuffers.mMaterialParamsBuffer.Destroy();
 
-        mTextures.mLUTBRDF.Destroy();
-        mTextures.mEnvCube.Destroy();
-        mTextures.mIrradianceCube.Destroy();
-        mTextures.mPreFilteredCube.Destroy();
+        // mTextures.mLUTBRDF.Destroy();
+        // mTextures.mEnvCube.Destroy();
+        // mTextures.mIrradianceCube.Destroy();
+        // mTextures.mPreFilteredCube.Destroy();
 
         mScenes.mRenderScene.Destroy(mDevice);
         mScenes.mSkybox.Destroy(mDevice);
@@ -50,88 +50,104 @@ void VulkanRenderer::GetEnabledFeatures()
 
 void VulkanRenderer::SetupDescriptors()
 {
-    uint32_t imageSamplerCount = 0;
+    uint32_t imageSamplerCount = 3;
     uint32_t materialCount = 0;
     uint32_t meshCount = 0;
     uint32_t uniformCount = 2;
 
-    for (auto& mat : mScenes.mRenderScene.mMaterials)
+    std::vector<LeoVK::GLTFScene*> modelList = {&mScenes.mSkybox, &mScenes.mRenderScene};
+    for (auto & model : modelList)
     {
-        imageSamplerCount += 5;
-        materialCount++;
-    }
-    for (auto& node : mScenes.mRenderScene.mLinearNodes)
-    {
-        if (node->mpMesh) meshCount++;
+        for (auto& mat : model->mMaterials)
+        {
+            imageSamplerCount += 5;
+            materialCount++;
+        }
+        for (auto& node : model->mLinearNodes)
+        {
+            if (node->mpMesh) meshCount++;
+        }
     }
     
     std::vector<VkDescriptorPoolSize> poolSize = {
-        LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uniformCount + meshCount),
+        LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 + meshCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
     };
-    const uint32_t maxSetCount = static_cast<uint32_t>(mScenes.mRenderScene.mTextures.size()) + meshCount + 4;
+    const uint32_t maxSetCount = materialCount + meshCount + 2;
     VkDescriptorPoolCreateInfo descSetPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descSetPoolCI, nullptr, &mDescPool));
 
-    // UniformBuffer的DescSetLayout
-    std::vector<VkDescriptorSetLayoutBinding> uniformSetLayoutBindings = {
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
-    };
-    VkDescriptorSetLayoutCreateInfo uniformDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(uniformSetLayoutBindings);
-    VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &uniformDescSetLayoutCI, nullptr, &mDescSetLayout.mUniformDescSetLayout));
-
-    // Sampler的DescSetLayout
-    std::vector<VkDescriptorSetLayoutBinding> samplerDescSetLayoutBinding = {
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 3),
-        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
-    };
-    VkDescriptorSetLayoutCreateInfo samplerDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(samplerDescSetLayoutBinding);
-    VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &samplerDescSetLayoutCI, nullptr, &mDescSetLayout.mTextureDescSetLayout));
-
-    // 分配Uniform的DescSet
-    VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mUniformDescSetLayout, uniformCount);
-    VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &mDescSets.mObjectDescSet));
-    std::vector<VkWriteDescriptorSet> objWriteDescSet = {
-        LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mUniformBuffers.mObjectUBO.mDescriptor),
-        LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &mUniformBuffers.mParamsUBO.mDescriptor),
-    };
-    vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(objWriteDescSet.size()), objWriteDescSet.data(), 0, nullptr);
-
-    // 分配Texture的DescSet
-    for (auto& mat : mScenes.mRenderScene.mMaterials)
+    // Scene
     {
-        const VkDescriptorSetAllocateInfo texDescAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mTextureDescSetLayout, 1);
-        VK_CHECK(vkAllocateDescriptorSets(mDevice, &texDescAI, &mat.mDescriptorSet));
-        std::vector<VkDescriptorImageInfo> imageDescs = {
-            mScenes.mRenderScene.mTextures.back().mDescriptor,
-            mScenes.mRenderScene.mTextures.back().mDescriptor,
-            mat.mpNormalTexture ? mat.mpNormalTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
-            mat.mpOcclusionTexture ? mat.mpOcclusionTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
-            mat.mpEmissiveTexture ? mat.mpEmissiveTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor
+        // UniformBuffer的DescSetLayout
+        std::vector<VkDescriptorSetLayoutBinding> uniformSetLayoutBindings = {
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 3),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
         };
-        if (mat.mPBRWorkFlows.mbMetallicRoughness)
-        {
-            if (mat.mpBaseColorTexture) imageDescs[0] = mat.mpBaseColorTexture->mDescriptor;
-            if (mat.mpMetallicRoughnessTexture) imageDescs[1] = mat.mpMetallicRoughnessTexture->mDescriptor;
-        }
-        if (mat.mPBRWorkFlows.mbSpecularGlossiness)
-        {
-            if (mat.mExtension.mpDiffuseTexture) imageDescs[0] = mat.mExtension.mpDiffuseTexture->mDescriptor;
-            if (mat.mExtension.mpSpecularGlossinessTexture) imageDescs[1] = mat.mExtension.mpSpecularGlossinessTexture->mDescriptor;
-        }
-        std::vector<VkWriteDescriptorSet> texWriteDescSet = {
-            LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &imageDescs[0]),
-            LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageDescs[1]),
-            LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &imageDescs[2]),
-            LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &imageDescs[3]),
-            LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &imageDescs[4]),
+        VkDescriptorSetLayoutCreateInfo uniformDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(uniformSetLayoutBindings);
+        VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &uniformDescSetLayoutCI, nullptr, &mDescSetLayout.mUniformDescSetLayout));
+
+        // 分配Uniform的DescSet
+        VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mUniformDescSetLayout, 1);
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &mDescSets.mObjectDescSet));
+        std::vector<VkWriteDescriptorSet> objWriteDescSet = {
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mUniformBuffers.mObjectUBO.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &mUniformBuffers.mParamsUBO.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &mTextures.mLUTBRDF.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &mTextures.mIrradianceCube.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mObjectDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &mTextures.mPreFilteredCube.mDescriptor)
         };
-        vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(texWriteDescSet.size()), texWriteDescSet.data(), 0, nullptr);
+        vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(objWriteDescSet.size()), objWriteDescSet.data(), 0, nullptr);
+    }
+
+    // Materials
+    {
+        // Sampler的DescSetLayout
+        std::vector<VkDescriptorSetLayoutBinding> samplerDescSetLayoutBinding = {
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 3),
+            LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
+        };
+        VkDescriptorSetLayoutCreateInfo samplerDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(samplerDescSetLayoutBinding);
+        VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &samplerDescSetLayoutCI, nullptr, &mDescSetLayout.mTextureDescSetLayout));
+
+        // 分配Texture的DescSet
+        for (auto& mat : mScenes.mRenderScene.mMaterials)
+        {
+            const VkDescriptorSetAllocateInfo texDescAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mTextureDescSetLayout, 1);
+            VK_CHECK(vkAllocateDescriptorSets(mDevice, &texDescAI, &mat.mDescriptorSet));
+            std::vector<VkDescriptorImageInfo> imageDescs = {
+                mScenes.mRenderScene.mTextures.back().mDescriptor,
+                mScenes.mRenderScene.mTextures.back().mDescriptor,
+                mat.mpNormalTexture ? mat.mpNormalTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
+                mat.mpOcclusionTexture ? mat.mpOcclusionTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
+                mat.mpEmissiveTexture ? mat.mpEmissiveTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor
+            };
+            if (mat.mPBRWorkFlows.mbMetallicRoughness)
+            {
+                if (mat.mpBaseColorTexture) imageDescs[0] = mat.mpBaseColorTexture->mDescriptor;
+                if (mat.mpMetallicRoughnessTexture) imageDescs[1] = mat.mpMetallicRoughnessTexture->mDescriptor;
+            }
+            if (mat.mPBRWorkFlows.mbSpecularGlossiness)
+            {
+                if (mat.mExtension.mpDiffuseTexture) imageDescs[0] = mat.mExtension.mpDiffuseTexture->mDescriptor;
+                if (mat.mExtension.mpSpecularGlossinessTexture) imageDescs[1] = mat.mExtension.mpSpecularGlossinessTexture->mDescriptor;
+            }
+            std::vector<VkWriteDescriptorSet> texWriteDescSet = {
+                LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &imageDescs[0]),
+                LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageDescs[1]),
+                LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &imageDescs[2]),
+                LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &imageDescs[3]),
+                LeoVK::Init::WriteDescriptorSet(mat.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &imageDescs[4]),
+            };
+            vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(texWriteDescSet.size()), texWriteDescSet.data(), 0, nullptr);
+        }
     }
 
     // Node Desc Set
@@ -160,6 +176,19 @@ void VulkanRenderer::SetupDescriptors()
 
         VkWriteDescriptorSet matWriteDescSet = LeoVK::Init::WriteDescriptorSet(mDescSets.mMaterialParamsDescSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &mUniformBuffers.mMaterialParamsBuffer.mDescriptor);
         vkUpdateDescriptorSets(mDevice, 1, &matWriteDescSet, 0, nullptr);
+    }
+
+    // Skybox
+    {
+        VkDescriptorSetAllocateInfo skyboxDescSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mUniformDescSetLayout, 1);
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &skyboxDescSetAI, &mDescSets.mSkyboxDescSet))
+
+        std::vector<VkWriteDescriptorSet> skyboxWriteDescSet = {
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mUniformBuffers.mSkyboxUBO.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &mUniformBuffers.mParamsUBO.mDescriptor),
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &mTextures.mEnvCube.mDescriptor)
+        };
+        vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(skyboxWriteDescSet.size()), skyboxWriteDescSet.data(), 0, nullptr);
     }
 }
 
@@ -344,10 +373,10 @@ void VulkanRenderer::LoadAssets()
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
-    // LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/TransmissionTest/glTF/TransmissionTest.gltf");
     // LoadScene(GetAssetsPath() + "Models/KnightArtorias/scene.gltf");
-    LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
+    // LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
     // LoadScene(GetAssetsPath() + "Models/CyberSamurai/scene.gltf");
 }
 
