@@ -30,9 +30,16 @@ VulkanRenderer::~VulkanRenderer()
 
         mUniformBuffers.mObjectUBO.Destroy();
         mUniformBuffers.mParamsUBO.Destroy();
+        mUniformBuffers.mSkyboxUBO.Destroy();
         mUniformBuffers.mMaterialParamsBuffer.Destroy();
 
-        mRenderScene.Destroy(mDevice);
+        mTextures.mLUTBRDF.Destroy();
+        mTextures.mEnvCube.Destroy();
+        mTextures.mIrradianceCube.Destroy();
+        mTextures.mPreFilteredCube.Destroy();
+
+        mScenes.mRenderScene.Destroy(mDevice);
+        mScenes.mSkybox.Destroy(mDevice);
     }
 }
 
@@ -48,12 +55,12 @@ void VulkanRenderer::SetupDescriptors()
     uint32_t meshCount = 0;
     uint32_t uniformCount = 2;
 
-    for (auto& mat : mRenderScene.mMaterials)
+    for (auto& mat : mScenes.mRenderScene.mMaterials)
     {
         imageSamplerCount += 5;
         materialCount++;
     }
-    for (auto& node : mRenderScene.mLinearNodes)
+    for (auto& node : mScenes.mRenderScene.mLinearNodes)
     {
         if (node->mpMesh) meshCount++;
     }
@@ -63,7 +70,7 @@ void VulkanRenderer::SetupDescriptors()
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
     };
-    const uint32_t maxSetCount = static_cast<uint32_t>(mRenderScene.mTextures.size()) + meshCount + 4;
+    const uint32_t maxSetCount = static_cast<uint32_t>(mScenes.mRenderScene.mTextures.size()) + meshCount + 4;
     VkDescriptorPoolCreateInfo descSetPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descSetPoolCI, nullptr, &mDescPool));
 
@@ -96,16 +103,16 @@ void VulkanRenderer::SetupDescriptors()
     vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(objWriteDescSet.size()), objWriteDescSet.data(), 0, nullptr);
 
     // 分配Texture的DescSet
-    for (auto& mat : mRenderScene.mMaterials)
+    for (auto& mat : mScenes.mRenderScene.mMaterials)
     {
         const VkDescriptorSetAllocateInfo texDescAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mTextureDescSetLayout, 1);
         VK_CHECK(vkAllocateDescriptorSets(mDevice, &texDescAI, &mat.mDescriptorSet));
         std::vector<VkDescriptorImageInfo> imageDescs = {
-            mRenderScene.mTextures.back().mDescriptor,
-            mRenderScene.mTextures.back().mDescriptor,
-            mat.mpNormalTexture ? mat.mpNormalTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
-            mat.mpOcclusionTexture ? mat.mpOcclusionTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor,
-            mat.mpEmissiveTexture ? mat.mpEmissiveTexture->mDescriptor : mRenderScene.mTextures.back().mDescriptor
+            mScenes.mRenderScene.mTextures.back().mDescriptor,
+            mScenes.mRenderScene.mTextures.back().mDescriptor,
+            mat.mpNormalTexture ? mat.mpNormalTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
+            mat.mpOcclusionTexture ? mat.mpOcclusionTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor,
+            mat.mpEmissiveTexture ? mat.mpEmissiveTexture->mDescriptor : mScenes.mRenderScene.mTextures.back().mDescriptor
         };
         if (mat.mPBRWorkFlows.mbMetallicRoughness)
         {
@@ -134,7 +141,7 @@ void VulkanRenderer::SetupDescriptors()
         };
         VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(nodeDescSetLayoutBinding);
         VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mNodeDescSetLayout));
-        for (auto & node : mRenderScene.mNodes)
+        for (auto & node : mScenes.mRenderScene.mNodes)
         {
             SetupNodeDescriptors(node);
         }
@@ -259,7 +266,7 @@ void VulkanRenderer::PrepareUniformBuffers()
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &mUniformBuffers.mObjectUBO,
-        sizeof(mUBOMatrices)));
+        sizeof(mSceneUBOMatrices)));
 
     VK_CHECK(mpVulkanDevice->CreateBuffer(
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -275,28 +282,28 @@ void VulkanRenderer::PrepareUniformBuffers()
 
 void VulkanRenderer::UpdateUniformBuffers()
 {
-    mUBOMatrices.mProj = mCamera.mMatrices.mPerspective;
-    mUBOMatrices.mView = mCamera.mMatrices.mView;
+    mSceneUBOMatrices.mProj = mCamera.mMatrices.mPerspective;
+    mSceneUBOMatrices.mView = mCamera.mMatrices.mView;
 
-    float a = mRenderScene.mAABB[0][0];
-    float b = mRenderScene.mAABB[1][1];
-    float c = mRenderScene.mAABB[2][2];
+    float a = mScenes.mRenderScene.mAABB[0][0];
+    float b = mScenes.mRenderScene.mAABB[1][1];
+    float c = mScenes.mRenderScene.mAABB[2][2];
     float scale = (1.0 / (std::max(a, std::max(b, c)))) * 0.5f;
-    glm::vec3 translate = -glm::vec3(mRenderScene.mAABB[3][0], mRenderScene.mAABB[3][1], mRenderScene.mAABB[3][2]);
-    translate += -0.5f * glm::vec3(mRenderScene.mAABB[0][0], mRenderScene.mAABB[1][1], mRenderScene.mAABB[2][2]);
-    mUBOMatrices.mModel = glm::mat4(1.0f);
-    mUBOMatrices.mModel[0][0] = scale;
-    mUBOMatrices.mModel[1][1] = scale;
-    mUBOMatrices.mModel[2][2] = scale;
-    mUBOMatrices.mModel = glm::translate(mUBOMatrices.mModel, translate);
+    glm::vec3 translate = -glm::vec3(mScenes.mRenderScene.mAABB[3][0], mScenes.mRenderScene.mAABB[3][1], mScenes.mRenderScene.mAABB[3][2]);
+    translate += -0.5f * glm::vec3(mScenes.mRenderScene.mAABB[0][0], mScenes.mRenderScene.mAABB[1][1], mScenes.mRenderScene.mAABB[2][2]);
+    mSceneUBOMatrices.mModel = glm::mat4(1.0f);
+    mSceneUBOMatrices.mModel[0][0] = scale;
+    mSceneUBOMatrices.mModel[1][1] = scale;
+    mSceneUBOMatrices.mModel[2][2] = scale;
+    mSceneUBOMatrices.mModel = glm::translate(mSceneUBOMatrices.mModel, translate);
 
-    mUBOMatrices.mCamPos = glm::vec3(
+    mSceneUBOMatrices.mCamPos = glm::vec3(
         -mCamera.mPosition.z * sin(glm::radians(mCamera.mRotation.y)) * cos(glm::radians(mCamera.mRotation.x)),
         -mCamera.mPosition.z * sin(glm::radians(mCamera.mRotation.x)),
          mCamera.mPosition.z * cos(glm::radians(mCamera.mRotation.y)) * cos(glm::radians(mCamera.mRotation.x))
     );
 
-    memcpy(mUniformBuffers.mObjectUBO.mpMapped, &mUBOMatrices, sizeof(mUBOMatrices));
+    memcpy(mUniformBuffers.mObjectUBO.mpMapped, &mSceneUBOMatrices, sizeof(mSceneUBOMatrices));
 }
 
 void VulkanRenderer::UpdateParams()
@@ -318,12 +325,12 @@ void VulkanRenderer::UpdateParams()
 void VulkanRenderer::LoadScene(std::string filename)
 {
     std::cout << "Loading scen from: " << filename << std::endl;
-    mRenderScene.Destroy(mDevice);
+    mScenes.mRenderScene.Destroy(mDevice);
     mAnimIndex = 0;
     mAnimTimer = 0.0f;
     auto tStart = std::chrono::high_resolution_clock::now();
-    mRenderScene.LoadFromFile(filename, mpVulkanDevice, mQueue);
-    mRenderScene.LoadMaterialBuffer(mUniformBuffers.mMaterialParamsBuffer, mQueue);
+    mScenes.mRenderScene.LoadFromFile(filename, mpVulkanDevice, mQueue);
+    mScenes.mRenderScene.LoadMaterialBuffer(mUniformBuffers.mMaterialParamsBuffer, mQueue);
     auto tFileLoad = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - tStart).count();
     std::cout << "Loading took " << tFileLoad << " ms" << std::endl;
     mCamera.SetPosition(glm::vec3(0.0f, 0.0f, -0.5f));
@@ -438,19 +445,19 @@ void VulkanRenderer::BuildCommandBuffers()
         vkCmdSetScissor(mDrawCmdBuffers[i], 0, 1, &scissor);
 
         VkDeviceSize offsets[1] = {0};
-        vkCmdBindVertexBuffers(mDrawCmdBuffers[i], 0, 1, &mRenderScene.mVertices.mBuffer, offsets);
-        vkCmdBindIndexBuffer(mDrawCmdBuffers[i], mRenderScene.mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(mDrawCmdBuffers[i], 0, 1, &mScenes.mRenderScene.mVertices.mBuffer, offsets);
+        vkCmdBindIndexBuffer(mDrawCmdBuffers[i], mScenes.mRenderScene.mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         mBoundPipeline = VK_NULL_HANDLE;
-        for (auto& node : mRenderScene.mNodes)
+        for (auto& node : mScenes.mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_OPAQUE);
         }
-        for (auto& node : mRenderScene.mNodes)
+        for (auto& node : mScenes.mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_MASK);
         }
-        for (auto& node : mRenderScene.mNodes)
+        for (auto& node : mScenes.mRenderScene.mNodes)
         {
             DrawNode(node, i, LeoVK::Material::ALPHA_MODE_BLEND);
         }
@@ -479,14 +486,14 @@ void VulkanRenderer::Render()
     RenderFrame();
     // std::cout << "Camera Position: " << mCamera.mPosition[0] << ", " << mCamera.mPosition[1] << ", " << mCamera.mPosition[2] << std::endl;
     if (mCamera.mbUpdated) UpdateUniformBuffers();
-    if (mbAnimate && !mRenderScene.mAnimations.empty())
+    if (mbAnimate && !mScenes.mRenderScene.mAnimations.empty())
     {
         mAnimTimer += mFrameTimer * mAnimateSpeed;
-        if (mAnimTimer > mRenderScene.mAnimations[mAnimIndex].mEnd)
+        if (mAnimTimer > mScenes.mRenderScene.mAnimations[mAnimIndex].mEnd)
         {
-            mAnimTimer -= mRenderScene.mAnimations[mAnimIndex].mEnd;
+            mAnimTimer -= mScenes.mRenderScene.mAnimations[mAnimIndex].mEnd;
         }
-        mRenderScene.UpdateAnimation(mAnimIndex, mAnimTimer);
+        mScenes.mRenderScene.UpdateAnimation(mAnimIndex, mAnimTimer);
     }
 }
 
@@ -499,7 +506,7 @@ void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 {
     if (overlay->Header("Settings")) 
     {
-        if (!mRenderScene.mAnimations.empty())
+        if (!mScenes.mRenderScene.mAnimations.empty())
         {
             if (overlay->Header("Animations"))
             {

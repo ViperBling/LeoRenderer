@@ -8,6 +8,20 @@
 #define ENABLE_VALIDATION true
 #define ENABLE_MSAA true
 
+struct SceneTextures
+{
+    LeoVK::Texture2D mLUTBRDF;
+    LeoVK::TextureCube mIrradianceCube;
+    LeoVK::TextureCube mPreFilteredCube;
+    LeoVK::TextureCube mEnvCube;
+};
+
+struct Models
+{
+    LeoVK::GLTFScene mRenderScene;
+    LeoVK::GLTFScene mSkybox;
+};
+
 struct UBOMatrices
 {
     glm::mat4 mProj;
@@ -21,6 +35,10 @@ struct UBOParams
     glm::vec4 mLight;
     float mExposure = 4.5f;
     float mGamma = 2.2f;
+    float mPrefilteredCubeMipLevels;
+    float mScaleIBLAmbient = 1.0f;
+    float mDebugViewInputs = 0;
+    float mDebugViewEquations = 0;
 };
 
 typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
@@ -28,6 +46,7 @@ typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
 struct PBRDescSets
 {
     VkDescriptorSet mObjectDescSet;
+    VkDescriptorSet mSkyboxDescSet;
     VkDescriptorSet mMaterialParamsDescSet;
 };
 
@@ -35,6 +54,7 @@ struct UBOBuffers
 {
     LeoVK::Buffer mObjectUBO;
     LeoVK::Buffer mParamsUBO;
+    LeoVK::Buffer mSkyboxUBO;
     LeoVK::Buffer mMaterialParamsBuffer;
 };
 
@@ -72,9 +92,11 @@ public:
 
 public:
 
-    LeoVK::GLTFScene mRenderScene;
+    Models mScenes;
+    SceneTextures mTextures;
     UBOBuffers mUniformBuffers;
-    UBOMatrices mUBOMatrices;
+    UBOMatrices mSceneUBOMatrices;
+    UBOMatrices mSkyboxUBOMatrices;
     UBOParams mUBOParams;
 
     PBRPipelines mPipelines;
@@ -90,4 +112,9 @@ public:
     float mAnimateSpeed = 1.5f;
 
     int32_t mCamTypeIndex = 0;
+
+    int32_t mDebugViewInputs = 0;
+    int32_t mDebugViewEquations = 0;
+
+    bool mbShowBackground = true;
 };
