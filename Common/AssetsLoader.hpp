@@ -146,7 +146,7 @@ namespace LeoVK
             VkBuffer                mBuffer;
             VkDeviceMemory          mMemory;
             VkDescriptorBufferInfo  mDescriptor;
-            VkDescriptorSet         mDescriptorSet{};
+            VkDescriptorSet         mDescriptorSet = VK_NULL_HANDLE;
             void*                   mpMapped;
         } mUniformBuffer;
 

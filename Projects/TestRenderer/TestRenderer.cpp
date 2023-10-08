@@ -25,7 +25,7 @@ TestRenderer::~TestRenderer()
 
         vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mUniformDescSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mTextureDescSetLayout, nullptr);
-		vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mNodeDescSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mNodeDescSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(mDevice, mDescSetLayout.mMaterialBufferDescSetLayout, nullptr);
 
         mUniformBuffers.mObjectUBO.Destroy();
@@ -53,18 +53,17 @@ void TestRenderer::SetupDescriptors()
         imageSamplerCount += 5;
         materialCount++;
     }
-	for (auto& node : mRenderScene.mLinearNodes)
-	{
-		if (node->mpMesh) meshCount++;
-	}
+    for (auto& node : mRenderScene.mLinearNodes)
+    {
+        if (node->mpMesh) meshCount++;
+    }
     
-    // 两种类型的DescSet，分别创建DescSetPool。UniformBuffer两个，TexSampler根据Material中的贴图数量创建
     std::vector<VkDescriptorPoolSize> poolSize = {
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uniformCount + meshCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
     };
-    const uint32_t maxSetCount = static_cast<uint32_t>(mRenderScene.mTextures.size()) + meshCount + 2;
+    const uint32_t maxSetCount = static_cast<uint32_t>(mRenderScene.mTextures.size()) + meshCount + 4;
     VkDescriptorPoolCreateInfo descSetPoolCI = LeoVK::Init::DescPoolCreateInfo(poolSize, maxSetCount);
     VK_CHECK(vkCreateDescriptorPool(mDevice, &descSetPoolCI, nullptr, &mDescPool));
 
@@ -118,15 +117,15 @@ void TestRenderer::SetupDescriptors()
         vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(texWriteDescSet.size()), texWriteDescSet.data(), 0, nullptr);
     }
 
-	std::vector<VkDescriptorSetLayoutBinding> nodeDescSetLayoutBinding = {
-		LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
-	};
-	VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(nodeDescSetLayoutBinding);
-	VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mNodeDescSetLayout));
-	for (auto & node : mRenderScene.mNodes)
-	{
-		SetupNodeDescriptors(node);
-	}
+    std::vector<VkDescriptorSetLayoutBinding> nodeDescSetLayoutBinding = {
+        LeoVK::Init::DescSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
+    };
+    VkDescriptorSetLayoutCreateInfo nodeDescSetLayoutCI = LeoVK::Init::DescSetLayoutCreateInfo(nodeDescSetLayoutBinding);
+    VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &nodeDescSetLayoutCI, nullptr, &mDescSetLayout.mNodeDescSetLayout));
+    for (auto & node : mRenderScene.mNodes)
+    {
+        SetupNodeDescriptors(node);
+    }
 
     // Material Buffer Descriptor
     {
@@ -146,18 +145,18 @@ void TestRenderer::SetupDescriptors()
 
 void TestRenderer::SetupNodeDescriptors(LeoVK::Node* node)
 {
-	if (node->mpMesh)
-	{
-		VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mNodeDescSetLayout, 1);
-		VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &node->mpMesh->mUniformBuffer.mDescriptorSet));
+    if (node->mpMesh)
+    {
+        VkDescriptorSetAllocateInfo descSetAI = LeoVK::Init::DescSetAllocateInfo(mDescPool, &mDescSetLayout.mNodeDescSetLayout, 1);
+        VK_CHECK(vkAllocateDescriptorSets(mDevice, &descSetAI, &node->mpMesh->mUniformBuffer.mDescriptorSet));
 
-		VkWriteDescriptorSet writeDescSet = LeoVK::Init::WriteDescriptorSet(node->mpMesh->mUniformBuffer.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &node->mpMesh->mUniformBuffer.mDescriptor);
-		vkUpdateDescriptorSets(mDevice, 1, &writeDescSet, 0, nullptr);
-	}
-	for (auto & child : node->mChildren)
-	{
-		SetupNodeDescriptors(child);
-	}
+        VkWriteDescriptorSet writeDescSet = LeoVK::Init::WriteDescriptorSet(node->mpMesh->mUniformBuffer.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &node->mpMesh->mUniformBuffer.mDescriptor);
+        vkUpdateDescriptorSets(mDevice, 1, &writeDescSet, 0, nullptr);
+    }
+    for (auto & child : node->mChildren)
+    {
+        SetupNodeDescriptors(child);
+    }
 }
 
 void TestRenderer::AddPipelineSet(const std::string prefix, const std::string vertexShader, const std::string pixelShader)
@@ -180,10 +179,10 @@ void TestRenderer::AddPipelineSet(const std::string prefix, const std::string ve
         LeoVK::Init::VIAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoVK::Vertex, mPos)),
         LeoVK::Init::VIAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(LeoVK::Vertex, mNormal)),
         LeoVK::Init::VIAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoVK::Vertex, mUV0)),
-		LeoVK::Init::VIAttributeDescription(0, 3, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoVK::Vertex, mUV1)),
-		LeoVK::Init::VIAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mColor)),
-		LeoVK::Init::VIAttributeDescription(0, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mJoint0)),
-		LeoVK::Init::VIAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mWeight0)),
+        LeoVK::Init::VIAttributeDescription(0, 3, VK_FORMAT_R32G32_SFLOAT, offsetof(LeoVK::Vertex, mUV1)),
+        LeoVK::Init::VIAttributeDescription(0, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mColor)),
+        LeoVK::Init::VIAttributeDescription(0, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mJoint0)),
+        LeoVK::Init::VIAttributeDescription(0, 6, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mWeight0)),
         LeoVK::Init::VIAttributeDescription(0, 7, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(LeoVK::Vertex, mTangent)),
     };
     VkPipelineVertexInputStateCreateInfo viStateCI = LeoVK::Init::PipelineVIStateCreateInfo(viBindings, viAttributes);
@@ -320,10 +319,12 @@ void TestRenderer::LoadScene(std::string filename)
 
 void TestRenderer::LoadAssets()
 {
-    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
-    LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
-    // LoadScene(GetAssetsPath() + "Models/Sponza/Sponza.gltf");
+    // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
+    // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
+    // LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
 }
 
 void TestRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
