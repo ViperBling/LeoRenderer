@@ -666,6 +666,12 @@ void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
     }
 }
 
+void VulkanRenderer::WindowResized()
+{
+    VKRendererBase::WindowResized();
+    UpdateUniformBuffers();
+}
+
 VulkanRenderer * testRenderer;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {

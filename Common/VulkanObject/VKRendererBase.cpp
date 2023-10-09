@@ -661,7 +661,9 @@ void VKRendererBase::MouseMoved(double x, double y, bool &handled)
 
 void VKRendererBase::WindowResized()
 {
-
+    BuildCommandBuffers();
+    vkDeviceWaitIdle(mDevice);
+    updateOverlay();
 }
 
 void VKRendererBase::BuildCommandBuffers()

@@ -77,6 +77,7 @@ public:
     void Render() override;
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
+    void WindowResized() override;
 
     void SetupDescriptors();
     void SetupNodeDescriptors(LeoVK::Node* node);
