@@ -37,8 +37,8 @@ struct UBOParams
     float mGamma = 2.2f;
     float mPrefilteredCubeMipLevels;
     float mScaleIBLAmbient = 1.0f;
-    float mDebugViewInputs = 0;
-    float mDebugViewEquations = 0;
+    glm::vec3 mLightColor = glm::vec3(1.0f);
+    float mLightIntensity = 1.0f;
 };
 
 typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
@@ -120,5 +120,7 @@ public:
     int32_t mDebugViewInputs = 0;
     int32_t mDebugViewEquations = 0;
 
+    std::map<std::string, std::string> mEnvMaps;
+    std::string mSelectEnvMap = "papermill";
     bool mbShowBackground = true;
 };

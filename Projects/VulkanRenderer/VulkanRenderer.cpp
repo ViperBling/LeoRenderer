@@ -408,7 +408,8 @@ void VulkanRenderer::LoadAssets()
     // LoadScene(GetAssetsPath() + "Models/CyberSamurai/scene.gltf");
 
     mScenes.mSkybox.LoadFromFile(GetAssetsPath() + "Models/Box/glTF-Embedded/Box.gltf", mpVulkanDevice, mQueue);
-    LoadEnvironment(GetAssetsPath() + "Environments/papermill.ktx");
+    LeoVK::VKTools::ReadDirectory(GetAssetsPath() + "Environments", "*.ktx", mEnvMaps, false);
+    LoadEnvironment(GetAssetsPath() + "Environments/pisa.ktx");
 }
 
 void VulkanRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -476,13 +477,13 @@ void VulkanRenderer::BuildCommandBuffers()
     VkClearValue clearValues[3];
     if (mSettings.multiSampling)
     {
-        clearValues[0].color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
-        clearValues[1].color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
+        clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+        clearValues[1].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
         clearValues[2].depthStencil = { 1.0f, 0 };
     }
     else
     {
-        clearValues[0].color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
+        clearValues[0].color = { { 0.0f, 0.1f, 0.0f, 1.0f } };
         clearValues[1].depthStencil = { 1.0f, 0 };
     }
 
@@ -553,7 +554,6 @@ void VulkanRenderer::Prepare()
 void VulkanRenderer::Render()
 {
     RenderFrame();
-    // std::cout << "Camera Position: " << mCamera.mPosition[0] << ", " << mCamera.mPosition[1] << ", " << mCamera.mPosition[2] << std::endl;
     if (mCamera.mbUpdated) UpdateUniformBuffers();
     if (mbAnimate && !mScenes.mRenderScene.mAnimations.empty())
     {
@@ -573,6 +573,70 @@ void VulkanRenderer::ViewChanged()
 
 void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
 {
+    bool bUpdateShaderParams = false;
+    bool bUpdateCBs = false;
+    if (overlay->Header("Scene"))
+    {
+        if (overlay->Button("Open GLTF File"))
+        {
+            std::string filename = "";
+            char buffer[256];
+            OPENFILENAMEA ofn;
+            ZeroMemory(&buffer, sizeof(buffer));
+            ZeroMemory(&ofn, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.lpstrFilter = "glTF files\0*.gltf;*.glb\0";
+            ofn.lpstrFile = buffer;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.lpstrTitle = "Select a glTF file to load";
+            ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+            if (GetOpenFileNameA(&ofn)) filename = buffer;
+            if (!filename.empty())
+            {
+                vkDeviceWaitIdle(mDevice);
+                LoadScene(filename);
+                SetupDescriptors();
+                bUpdateCBs = true;
+            }
+        }
+
+        if (overlay->ComboBox("Environment", mSelectEnvMap, mEnvMaps))
+        {
+            vkDeviceWaitIdle(mDevice);
+            LoadEnvironment(mEnvMaps[mSelectEnvMap]);
+            SetupDescriptors();
+            bUpdateCBs = true;
+        }
+    }
+
+    if (overlay->Header("Environment"))
+    {
+        if (overlay->ColorPicker("Light Color", glm::value_ptr(mUBOParams.mLightColor)))
+        {
+            bUpdateShaderParams = true;
+        }
+        if (overlay->SliderFloat("DirectLight Intensity", &mUBOParams.mLightIntensity, 0.1f, 10.0f))
+        {
+            bUpdateShaderParams = true;
+        }
+        if (overlay->CheckBox("Background", &mbShowBackground))
+        {
+            bUpdateShaderParams = true;
+        }
+        if (overlay->SliderFloat("Exposure", &mUBOParams.mExposure, 0.1f, 10.0f))
+        {
+            bUpdateShaderParams = true;
+        }
+        if (overlay->SliderFloat("Gamma", &mUBOParams.mGamma, 0.1f, 4.0f))
+        {
+            bUpdateShaderParams = true;
+        }
+        if (overlay->SliderFloat("IBL", &mUBOParams.mScaleIBLAmbient, 0.0f, 2.0f))
+        {
+            bUpdateShaderParams = true;
+        }
+    }
+
     if (overlay->Header("Settings")) 
     {
         if (!mScenes.mRenderScene.mAnimations.empty())
@@ -591,6 +655,14 @@ void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
                 mCamera.mType = static_cast<CameraType>(mCamTypeIndex);
             }
         }
+    }
+
+    if (bUpdateShaderParams) UpdateParams();
+    if (bUpdateCBs) 
+    {
+        vkDeviceWaitIdle(mDevice);
+        BuildCommandBuffers();
+        vkDeviceWaitIdle(mDevice);
     }
 }
 

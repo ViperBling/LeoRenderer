@@ -25,6 +25,9 @@ layout (set = 0, binding = 1) uniform UBOParam
     float exposure;
     float gamma;
     float prefilteredCubeMipLevels;
+    float scaleIBLAmbient;
+    vec3 lightColor;
+    float lightIntensity;
 } uboParams;
 
 layout (set = 0, binding = 2) uniform sampler2D samplerBRDFLUT;
@@ -61,7 +64,7 @@ vec3 GetIBLContribution(PBRFactors pbrFactors, vec3 n, vec3 reflection)
     vec3 diffuse = diffuseLight * pbrFactors.diffuseColor;
     vec3 specular = specularLight * (pbrFactors.specularColor * brdf.x + brdf.y);
 
-    return (diffuse + specular) * 2.0f;
+    return (diffuse + specular) * uboParams.scaleIBLAmbient;
 }
 
 void main()
@@ -173,7 +176,7 @@ void main()
         pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
-    vec3 color = GetDirectionLight(vec3(1.0f), matFactor, pbrFactor);
+    vec3 color = GetDirectionLight(uboParams.lightColor, uboParams.lightIntensity, matFactor, pbrFactor);
 
     const float u_OcclusionStrength = 1.0f;
     if (material.occlusionTextureSet > -1) 

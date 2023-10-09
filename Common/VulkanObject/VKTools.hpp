@@ -97,4 +97,6 @@ namespace LeoVK::VKTools
     bool FileExists(const std::string& filename);
 
     uint32_t AlignedSize(uint32_t value, uint32_t alignment);
+
+    void ReadDirectory(const std::string& directory, const std::string& pattern, std::map<std::string, std::string>& fileList, bool recursive);
 }

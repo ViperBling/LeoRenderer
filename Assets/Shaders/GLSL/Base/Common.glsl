@@ -144,9 +144,9 @@ vec3 CalculateNormal(vec3 tangentNormal, vec3 inWorldPos, vec3 inNormal, vec2 in
     return normalize(TBN * tangentNormal);
 }
 
-vec3 GetDirectionLight(vec3 lightColor, MaterialFactor matFactor, PBRFactors pbrFactor)
+vec3 GetDirectionLight(vec3 lightColor, float lightIntensity, MaterialFactor matFactor, PBRFactors pbrFactor)
 {
-    vec3 radiance = lightColor;
+    vec3 radiance = lightColor * lightIntensity;
 
     vec3 F = F_Schlick(pbrFactor);
     float D = D_GGX(pbrFactor);

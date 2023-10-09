@@ -462,6 +462,29 @@ namespace LeoVK
         return res;
     }
 
+    bool UIOverlay::ComboBox(const char *caption, std::string &selectedkey, std::map<std::string, std::string> items)
+    {
+        bool selectionChanged = false;
+        if (ImGui::BeginCombo(caption, selectedkey.c_str())) 
+        {
+            for (auto it = items.begin(); it != items.end(); ++it) 
+            {
+                const bool isSelected = it->first == selectedkey;
+                if (ImGui::Selectable(it->first.c_str(), isSelected)) 
+                {
+                    selectionChanged = it->first != selectedkey;
+                    selectedkey = it->first;
+                }
+                if (isSelected) 
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        return selectionChanged;
+    }
+
     bool UIOverlay::Button(const char *caption)
     {
         bool res = ImGui::Button(caption);

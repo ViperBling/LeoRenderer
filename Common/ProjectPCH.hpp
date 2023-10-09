@@ -18,6 +18,7 @@
 #include <numeric>
 #include <exception>
 #include <array>
+#include <map>
 
 #include <windows.h>
 #include <fcntl.h>

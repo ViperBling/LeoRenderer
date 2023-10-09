@@ -34,6 +34,7 @@ namespace LeoVK
         bool SliderFloat(const char* caption, float* value, float min, float max);
         bool SliderInt(const char* caption, int32_t* value, int32_t min, int32_t max);
         bool ComboBox(const char* caption, int32_t* itemIndex, std::vector<std::string> items);
+        bool ComboBox(const char* caption, std::string &selectedkey, std::map<std::string, std::string> items);
         bool Button(const char* caption);
         bool ColorPicker(const char* caption, float* color);
         void Text(const char* formatStr, ...);
