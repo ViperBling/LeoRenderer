@@ -1348,21 +1348,9 @@ namespace LeoVK
     {
         if (node->mpMesh)
         {
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1, &node->mpMesh->mUniformBuffer.mDescriptorSet, 0, nullptr);
-
             for (Primitive *primitive : node->mpMesh->mPrimitives)
             {
-                bool skip = false;
-                const Material& mat = primitive->mMaterial;
-                if (renderFlag & Material::ALPHA_MODE_OPAQUE) skip = (mat.mAlphaMode != Material::ALPHA_MODE_OPAQUE);
-                if (renderFlag & Material::ALPHA_MODE_MASK) skip = (mat.mAlphaMode != Material::ALPHA_MODE_MASK);
-                if (renderFlag & Material::ALPHA_MODE_BLEND) skip = (mat.mAlphaMode != Material::ALPHA_MODE_BLEND);
-
-                if (!skip)
-                {
-                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bindImageSet, 1, &mat.mDescriptorSet, 0, nullptr);
-                    vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
-                }
+                vkCmdDrawIndexed(commandBuffer, primitive->mIndexCount, 1, primitive->mFirstIndex, 0, 0);
             }
         }
         for (auto& child : node->mChildren)

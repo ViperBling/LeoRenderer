@@ -33,10 +33,10 @@ VulkanRenderer::~VulkanRenderer()
         mUniformBuffers.mSkyboxUBO.Destroy();
         mUniformBuffers.mMaterialParamsBuffer.Destroy();
 
-        // mTextures.mLUTBRDF.Destroy();
-        // mTextures.mEnvCube.Destroy();
-        // mTextures.mIrradianceCube.Destroy();
-        // mTextures.mPreFilteredCube.Destroy();
+        mTextures.mLUTBRDF.Destroy();
+        mTextures.mEnvCube.Destroy();
+        mTextures.mIrradianceCube.Destroy();
+        mTextures.mPreFilteredCube.Destroy();
 
         mScenes.mRenderScene.Destroy(mDevice);
         mScenes.mSkybox.Destroy(mDevice);
@@ -186,7 +186,7 @@ void VulkanRenderer::SetupDescriptors()
         std::vector<VkWriteDescriptorSet> skyboxWriteDescSet = {
             LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &mUniformBuffers.mSkyboxUBO.mDescriptor),
             LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &mUniformBuffers.mParamsUBO.mDescriptor),
-            LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &mTextures.mEnvCube.mDescriptor)
+            LeoVK::Init::WriteDescriptorSet(mDescSets.mSkyboxDescSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &mTextures.mPreFilteredCube.mDescriptor)
         };
         vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(skyboxWriteDescSet.size()), skyboxWriteDescSet.data(), 0, nullptr);
     }
@@ -214,7 +214,7 @@ void VulkanRenderer::AddPipelineSet(const std::string prefix, const std::string 
     VkPipelineRasterizationStateCreateInfo rsStateCI = LeoVK::Init::PipelineRSStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
     VkPipelineColorBlendAttachmentState cbAttachCI = LeoVK::Init::PipelineCBAState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
     VkPipelineColorBlendStateCreateInfo cbStateCI = LeoVK::Init::PipelineCBStateCreateInfo(1, &cbAttachCI);
-    VkPipelineDepthStencilStateCreateInfo dsStateCI = LeoVK::Init::PipelineDSStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+    VkPipelineDepthStencilStateCreateInfo dsStateCI = LeoVK::Init::PipelineDSStateCreateInfo(prefix == "Skybox" ? VK_FALSE : VK_TRUE, prefix == "Skybox" ? VK_FALSE : VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
     VkPipelineViewportStateCreateInfo vpStateCI = LeoVK::Init::PipelineVPStateCreateInfo(1, 1, 0);
     VkPipelineMultisampleStateCreateInfo msStateCI = LeoVK::Init::PipelineMSStateCreateInfo(mSettings.multiSampling ? mSettings.sampleCount : VK_SAMPLE_COUNT_1_BIT, 0);
     const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
@@ -285,6 +285,7 @@ void VulkanRenderer::PreparePipelines()
     pipelineLayoutCI.pPushConstantRanges = &pushConstRange;
     VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutCI, nullptr, &mPipelineLayout));
 
+    AddPipelineSet("Skybox", "Base/Skybox.vert.spv", "Base/Skybox.frag.spv");
     AddPipelineSet("PBR", "VulkanRenderer/PBRShader.vert.spv", "VulkanRenderer/PBRShader.frag.spv");
     AddPipelineSet("Unlit", "VulkanRenderer/PBRShader.vert.spv", "VulkanRenderer/PBRUnlitShader.frag.spv");
 }
@@ -295,15 +296,23 @@ void VulkanRenderer::PrepareUniformBuffers()
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &mUniformBuffers.mObjectUBO,
-        sizeof(mSceneUBOMatrices)));
-
+        sizeof(mSceneUBOMatrices)
+    ));
+    VK_CHECK(mpVulkanDevice->CreateBuffer(
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &mUniformBuffers.mSkyboxUBO,
+        sizeof(mSkyboxUBOMatrices)
+    ));
     VK_CHECK(mpVulkanDevice->CreateBuffer(
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &mUniformBuffers.mParamsUBO,
-        sizeof(mUBOParams)));
+        sizeof(mUBOParams)
+    ));
 
     VK_CHECK(mUniformBuffers.mObjectUBO.Map())
+    VK_CHECK(mUniformBuffers.mSkyboxUBO.Map())
     VK_CHECK(mUniformBuffers.mParamsUBO.Map())
     UpdateUniformBuffers();
     UpdateParams();
@@ -333,6 +342,12 @@ void VulkanRenderer::UpdateUniformBuffers()
     );
 
     memcpy(mUniformBuffers.mObjectUBO.mpMapped, &mSceneUBOMatrices, sizeof(mSceneUBOMatrices));
+
+    mSkyboxUBOMatrices.mProj = mCamera.mMatrices.mPerspective;
+    mSkyboxUBOMatrices.mView = mCamera.mMatrices.mView;
+    mSkyboxUBOMatrices.mModel = glm::mat4(glm::mat3(mCamera.mMatrices.mView));
+
+    memcpy(mUniformBuffers.mSkyboxUBO.mpMapped, &mSkyboxUBOMatrices, sizeof(mSkyboxUBOMatrices));
 }
 
 void VulkanRenderer::UpdateParams()
@@ -366,18 +381,34 @@ void VulkanRenderer::LoadScene(std::string filename)
     mCamera.SetRotation({ 0.0f, 0.0f, 0.0f });
 }
 
+void VulkanRenderer::LoadEnvironment(std::string filename)
+{
+    std::cout << "Loading environment from " << filename << std::endl;
+    if (mTextures.mEnvCube.mImage) 
+    {
+        mTextures.mEnvCube.Destroy();
+        mTextures.mIrradianceCube.Destroy();
+        mTextures.mPreFilteredCube.Destroy();
+    }
+    mTextures.mEnvCube.LoadFromFile(filename, VK_FORMAT_R16G16B16A16_SFLOAT, mpVulkanDevice, mQueue);
+    GenerateCubeMaps();
+}
+
 void VulkanRenderer::LoadAssets()
 {
-    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
     // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
-    LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
+    // LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/TransmissionTest/glTF/TransmissionTest.gltf");
     // LoadScene(GetAssetsPath() + "Models/KnightArtorias/scene.gltf");
     // LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
     // LoadScene(GetAssetsPath() + "Models/CyberSamurai/scene.gltf");
+
+    mScenes.mSkybox.LoadFromFile(GetAssetsPath() + "Models/Box/glTF-Embedded/Box.gltf", mpVulkanDevice, mQueue);
+    LoadEnvironment(GetAssetsPath() + "Environments/papermill.ktx");
 }
 
 void VulkanRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -474,6 +505,13 @@ void VulkanRenderer::BuildCommandBuffers()
         vkCmdSetScissor(mDrawCmdBuffers[i], 0, 1, &scissor);
 
         VkDeviceSize offsets[1] = {0};
+        if (mbShowBackground) 
+        {
+            vkCmdBindDescriptorSets(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &mDescSets.mSkyboxDescSet, 0, nullptr);
+            vkCmdBindPipeline(mDrawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelines["Skybox"]);
+            mScenes.mSkybox.Draw(mDrawCmdBuffers[i], mPipelineLayout);
+        }
+
         vkCmdBindVertexBuffers(mDrawCmdBuffers[i], 0, 1, &mScenes.mRenderScene.mVertices.mBuffer, offsets);
         vkCmdBindIndexBuffer(mDrawCmdBuffers[i], mScenes.mRenderScene.mIndices.mBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -502,6 +540,8 @@ void VulkanRenderer::Prepare()
 {
     VKRendererBase::Prepare();
     LoadAssets();
+    GenerateBRDFLUT();
+    
     PrepareUniformBuffers();
     SetupDescriptors();
     PreparePipelines();

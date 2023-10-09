@@ -2,6 +2,7 @@
 const float c_MinRoughness = 0.04;
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
+const uint NUM_SAMPLES = 1024u;
 
 struct ShaderMaterial 
 {
@@ -57,6 +58,13 @@ vec3 UnchartedTonemap(vec3 x)
     float E = 0.02;
     float F = 0.30;
     return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+vec4 Tonemap(vec4 color, float exposure, float gamma)
+{
+	vec3 outcol = UnchartedTonemap(color.rgb * exposure);
+	outcol = outcol * (1.0f / UnchartedTonemap(vec3(11.2f)));	
+	return vec4(pow(outcol, vec3(1.0f / gamma)), color.a);
 }
 
 vec4 SRGBtoLINEAR(vec4 srgbIn)
@@ -155,4 +163,94 @@ vec3 GetDirectionLight(vec3 lightColor, MaterialFactor matFactor, PBRFactors pbr
     vec3 specular = nominator / max(denominator, 0.0001);
 
     return (diffuse + specular) * radiance * pbrFactor.NoL;
+}
+
+// IBL
+// Based omn http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
+float Random(vec2 co)
+{
+    float a = 12.9898;
+    float b = 78.233;
+    float c = 43758.5453;
+    float dt= dot(co.xy ,vec2(a,b));
+    float sn= mod(dt,3.14);
+    return fract(sin(sn) * c);
+}
+
+vec2 Hammersley2D(uint i, uint N)
+{
+    // Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
+    uint bits = (i << 16u) | (i >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    float rdi = float(bits) * 2.3283064365386963e-10;
+    return vec2(float(i) /float(N), rdi);
+}
+
+// Based on http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_slides.pdf
+vec3 ImportanceSampleGGX(vec2 Xi, float roughness, vec3 normal) 
+{
+    // Maps a 2D point to a hemisphere with spread based on roughness
+    float alpha = roughness * roughness;
+    float phi = 2.0 * PI * Xi.x + Random(normal.xz) * 0.1;
+    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha*alpha - 1.0) * Xi.y));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    vec3 H = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
+
+    // Tangent space
+    vec3 up = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangentX = normalize(cross(up, normal));
+    vec3 tangentY = normalize(cross(normal, tangentX));
+
+    // Convert to world Space
+    return normalize(tangentX * H.x + tangentY * H.y + normal * H.z);
+}
+
+// Geometric Shadowing function
+float G_SchlicksmithGGX(float NoL, float NoV, float roughness)
+{
+	float k = (roughness * roughness) / 2.0;
+	float GL = NoL / (NoL * (1.0 - k) + k);
+	float GV = NoV / (NoV * (1.0 - k) + k);
+	return GL * GV;
+}
+
+// Normal Distribution function
+float D_GGX(float NoH, float roughness)
+{
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float denom = NoH * NoH * (alpha2 - 1.0) + 1.0;
+    return (alpha2)/(PI * denom*denom); 
+}
+
+vec2 BRDF(float NoV, float roughness)
+{
+    // Normal always points along z-axis for the 2D lookup 
+    const vec3 N = vec3(0.0, 0.0, 1.0);
+    vec3 V = vec3(sqrt(1.0 - NoV*NoV), 0.0, NoV);
+
+    vec2 LUT = vec2(0.0);
+    for(uint i = 0u; i < NUM_SAMPLES; i++) 
+    {
+        vec2 Xi = Hammersley2D(i, NUM_SAMPLES);
+        vec3 H = ImportanceSampleGGX(Xi, roughness, N);
+        vec3 L = 2.0 * dot(V, H) * H - V;
+
+        float dotNL = max(dot(N, L), 0.0);
+        float dotNV = max(dot(N, V), 0.0);
+        float dotVH = max(dot(V, H), 0.0); 
+        float dotNH = max(dot(H, N), 0.0);
+
+        if (dotNL > 0.0) 
+        {
+            float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
+            float G_Vis = (G * dotVH) / (dotNH * dotNV);
+            float Fc = pow(1.0 - dotVH, 5.0);
+            LUT += vec2((1.0 - Fc) * G_Vis, Fc * G_Vis);
+        }
+    }
+    return LUT / float(NUM_SAMPLES);
 }

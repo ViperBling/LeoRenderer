@@ -90,6 +90,7 @@ public:
     void GenerateCubeMaps();
 
     void LoadScene(std::string filename);
+    void LoadEnvironment(std::string filename);
     void LoadAssets();
     void DrawNode(LeoVK::Node* node, uint32_t cbIndex, LeoVK::Material::AlphaMode alphaMode);
 
