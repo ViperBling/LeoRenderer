@@ -24,7 +24,12 @@ layout (set = 0, binding = 1) uniform UBOParam
     vec4 lightPos;
     float exposure;
     float gamma;
+    float prefilteredCubeMipLevels;
 } uboParams;
+
+layout (set = 0, binding = 2) uniform samplerCube samplerIrradiance;
+layout (set = 0, binding = 3) uniform samplerCube samplerPrefilterMap;
+layout (set = 0, binding = 4) uniform sampler2D samplerBRDFLUT;
 
 layout (set = 1, binding = 0) uniform sampler2D samplerColorMap;
 layout (set = 1, binding = 1) uniform sampler2D samplerMetalicRoughnessMap;
@@ -44,6 +49,21 @@ layout (push_constant) uniform PushConstants
 	int materialIndex;
 } pushConstants;
 
+
+vec3 GetIBLContribution(PBRFactors pbrFactors, vec3 n, vec3 reflection)
+{
+    float lod = (pbrFactors.perceptualRoughness * uboParams.prefilteredCubeMipLevels);
+    vec3 brdf = (texture(samplerBRDFLUT, vec2(pbrFactors.NoV, 1.0 - pbrFactors.perceptualRoughness))).rgb;
+    
+    vec3 diffuseLight = SRGBtoLINEAR(Tonemap(texture(samplerIrradiance, n), uboParams.exposure, uboParams.gamma)).rgb;
+    vec3 specularLight = SRGBtoLINEAR(Tonemap(textureLod(samplerPrefilterMap, reflection, lod), uboParams.exposure, uboParams.gamma)).rgb;
+
+    vec3 diffuse = diffuseLight * pbrFactors.diffuseColor;
+    vec3 specular = specularLight * (pbrFactors.specularColor * brdf.x + brdf.y);
+
+    return diffuse + specular;
+}
+
 void main()
 {
     ShaderMaterial material = materials[pushConstants.materialIndex];
@@ -52,6 +72,8 @@ void main()
     vec3 V = normalize(inWorldPos - uboScene.camPos);
     vec3 L = normalize(uboParams.lightPos.xyz);
     vec3 H = normalize(L + V);
+    vec3 R = -normalize(reflect(V, N));
+    R.y *= -1.0f;
 
     MaterialFactor matFactor;
     {
@@ -167,6 +189,7 @@ void main()
         emissive *= SRGBtoLINEAR(texture(samplerEmissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1)).rgb;
     };
     color += emissive;
+    color += GetIBLContribution(pbrFactor, N, R);
 
     color = pow(vec3(color), vec3(0.4545));
     outColor = vec4(color.rgb, matFactor.albedo.a);

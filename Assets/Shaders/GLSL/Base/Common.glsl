@@ -165,7 +165,7 @@ vec3 GetDirectionLight(vec3 lightColor, MaterialFactor matFactor, PBRFactors pbr
     return (diffuse + specular) * radiance * pbrFactor.NoL;
 }
 
-// IBL
+// ===================================== IBL ===================================== //
 // Based omn http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
 float Random(vec2 co)
 {
