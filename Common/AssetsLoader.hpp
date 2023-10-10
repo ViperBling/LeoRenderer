@@ -286,7 +286,6 @@ namespace LeoVK
 
     public:
         LeoVK::VulkanDevice* mpDevice{};
-        VkDescriptorPool     mDescPool{};
 
         Vertices    mVertices;
         Indices     mIndices;

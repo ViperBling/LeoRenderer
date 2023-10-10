@@ -53,7 +53,6 @@ void VulkanRenderer::SetupDescriptors()
     uint32_t imageSamplerCount = 3;
     uint32_t materialCount = 0;
     uint32_t meshCount = 0;
-    uint32_t uniformCount = 2;
 
     std::vector<LeoVK::GLTFScene*> modelList = {&mScenes.mSkybox, &mScenes.mRenderScene};
     for (auto & model : modelList)
@@ -69,6 +68,7 @@ void VulkanRenderer::SetupDescriptors()
         }
     }
     
+    if (mDescPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(mDevice, mDescPool, nullptr);
     std::vector<VkDescriptorPoolSize> poolSize = {
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 + meshCount),
         LeoVK::Init::DescPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageSamplerCount),
@@ -396,8 +396,8 @@ void VulkanRenderer::LoadEnvironment(std::string filename)
 
 void VulkanRenderer::LoadAssets()
 {
-    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
-    // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
+    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
@@ -670,6 +670,14 @@ void VulkanRenderer::WindowResized()
 {
     VKRendererBase::WindowResized();
     UpdateUniformBuffers();
+}
+
+void VulkanRenderer::FileDropped(std::string &filename)
+{
+    vkDeviceWaitIdle(mDevice);
+    LoadScene(filename);
+    SetupDescriptors();
+    BuildCommandBuffers();
 }
 
 VulkanRenderer * testRenderer;

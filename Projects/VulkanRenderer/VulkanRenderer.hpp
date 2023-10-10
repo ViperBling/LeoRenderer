@@ -78,6 +78,7 @@ public:
     void ViewChanged() override;
     void OnUpdateUIOverlay(LeoVK::UIOverlay* overlay) override;
     void WindowResized() override;
+    void FileDropped(std::string &filename) override;
 
     void SetupDescriptors();
     void SetupNodeDescriptors(LeoVK::Node* node);
