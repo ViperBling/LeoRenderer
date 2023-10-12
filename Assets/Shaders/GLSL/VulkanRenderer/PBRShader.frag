@@ -168,12 +168,11 @@ void main()
         pbrFactor.diffuseColor *= 1.0 - matFactor.metalic;
         pbrFactor.specularColor = mix(F0, matFactor.albedo.rgb, matFactor.metalic);
         
-        // pbrFactor.perceptualRoughness = clamp(matFactor.roughness, 0.04, 1.0);
         pbrFactor.alphaRoughness = matFactor.roughness * matFactor.roughness;
 
         float reflectance = max(max(pbrFactor.specularColor.r, pbrFactor.specularColor.g), pbrFactor.specularColor.b);
         pbrFactor.reflectance0 = pbrFactor.specularColor.rgb;
-        pbrFactor.reflectance90 = vec3(clamp(reflectance * 100.0, 0.0, 1.0));
+        pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
     }
 
     vec3 color = GetDirectionLight(uboParams.lightColor, uboParams.lightIntensity, matFactor, pbrFactor);
@@ -197,5 +196,4 @@ void main()
     color = pow(vec3(color), vec3(0.4545));
     color = AMDTonemapper(color.rgb);
     outColor = vec4(color.rgb, matFactor.albedo.a);
-    // outColor = vec4(vec3(matFactor.metalic), matFactor.albedo.a);
 }
