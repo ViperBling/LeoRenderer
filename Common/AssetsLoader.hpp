@@ -164,7 +164,7 @@ namespace LeoVK
         std::string             mName;
     };
 
-    struct Node;
+    class Node;
 
     struct Skin
     {

@@ -338,9 +338,9 @@ void TestRenderer::LoadAssets()
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
     // LoadScene(GetAssetsPath() + "Models/SciFiHelmet/glTF/SciFiHelmet.gltf");
-    LoadScene(GetAssetsPath() + "Models/TransmissionTest/glTF/TransmissionTest.gltf");
+    // LoadScene(GetAssetsPath() + "Models/TransmissionTest/glTF/TransmissionTest.gltf");
     // LoadScene(GetAssetsPath() + "Models/KnightArtorias/scene.gltf");
-    // LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
+    LoadScene(GetAssetsPath() + "Models/MechDrone/scene.gltf");
     // LoadScene(GetAssetsPath() + "Models/CyberSamurai/scene.gltf");
 }
 

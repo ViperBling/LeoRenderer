@@ -173,7 +173,7 @@ void main()
 
         float reflectance = max(max(pbrFactor.specularColor.r, pbrFactor.specularColor.g), pbrFactor.specularColor.b);
         pbrFactor.reflectance0 = pbrFactor.specularColor.rgb;
-        pbrFactor.reflectance90 = vec3(clamp(reflectance * 25.0, 0.0, 1.0));
+        pbrFactor.reflectance90 = vec3(clamp(reflectance * 100.0, 0.0, 1.0));
     }
 
     vec3 color = GetDirectionLight(uboParams.lightColor, uboParams.lightIntensity, matFactor, pbrFactor);
@@ -189,12 +189,13 @@ void main()
     if (material.emissiveTextureSet > -1) 
     {
         emissive = material.emissiveFactor.rgb * material.emissiveStrength;
-        emissive *= SRGBtoLINEAR(texture(samplerEmissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1)).rgb;
+        emissive *= SRGBtoLINEAR(texture(samplerEmissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1)).rgb * 10.0f;
     };
     color += emissive;
     color += GetIBLContribution(pbrFactor, N, R);
 
     color = pow(vec3(color), vec3(0.4545));
+    color = AMDTonemapper(color.rgb);
     outColor = vec4(color.rgb, matFactor.albedo.a);
     // outColor = vec4(vec3(matFactor.metalic), matFactor.albedo.a);
 }

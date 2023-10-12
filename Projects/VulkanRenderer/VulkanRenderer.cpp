@@ -396,8 +396,8 @@ void VulkanRenderer::LoadEnvironment(std::string filename)
 
 void VulkanRenderer::LoadAssets()
 {
-    // LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
-    LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
+    LoadScene(GetAssetsPath() + "Models/BusterDrone/busterDrone.gltf");
+    // LoadScene(GetAssetsPath() + "Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/FlightHelmet/glTF/FlightHelmet.gltf");
     // LoadScene(GetAssetsPath() + "Models/Sponza/glTF/Sponza.gltf");
     // LoadScene(GetAssetsPath() + "Models/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
@@ -409,7 +409,7 @@ void VulkanRenderer::LoadAssets()
 
     mScenes.mSkybox.LoadFromFile(GetAssetsPath() + "Models/Box/glTF-Embedded/Box.gltf", mpVulkanDevice, mQueue);
     LeoVK::VKTools::ReadDirectory(GetAssetsPath() + "Environments", "*.ktx", mEnvMaps, false);
-    LoadEnvironment(GetAssetsPath() + "Environments/pisa.ktx");
+    LoadEnvironment(GetAssetsPath() + "Environments/papermill.ktx");
 }
 
 void VulkanRenderer::DrawNode(LeoVK::Node* node, uint32_t cbIndex , LeoVK::Material::AlphaMode alphaMode)
@@ -615,7 +615,7 @@ void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
         {
             bUpdateShaderParams = true;
         }
-        if (overlay->SliderFloat("DirectLight Intensity", &mUBOParams.mLightIntensity, 0.1f, 10.0f))
+        if (overlay->SliderFloat("DirectLight Intensity", &mUBOParams.mLightIntensity, 0.1f, 100.0f))
         {
             bUpdateShaderParams = true;
         }
@@ -631,7 +631,7 @@ void VulkanRenderer::OnUpdateUIOverlay(LeoVK::UIOverlay *overlay)
         {
             bUpdateShaderParams = true;
         }
-        if (overlay->SliderFloat("IBL", &mUBOParams.mScaleIBLAmbient, 0.0f, 2.0f))
+        if (overlay->SliderFloat("IBL", &mUBOParams.mScaleIBLAmbient, 0.0f, 10.0f))
         {
             bUpdateShaderParams = true;
         }

@@ -38,7 +38,7 @@ struct UBOParams
     float mPrefilteredCubeMipLevels;
     float mScaleIBLAmbient = 1.0f;
     glm::vec3 mLightColor = glm::vec3(1.0f);
-    float mLightIntensity = 1.0f;
+    float mLightIntensity = 10.0f;
 };
 
 typedef std::unordered_map<std::string, VkPipeline> PBRPipelines;
