@@ -1,7 +1,7 @@
 #include "Camera.hpp"
 
-void Camera::SetPerspective(float fov, float aspect, float zNear, float zFar) {
-
+void Camera::SetPerspective(float fov, float aspect, float zNear, float zFar) 
+{
     mFov = fov;
     mZNear = zNear;
     mZFar = zFar;
@@ -10,14 +10,14 @@ void Camera::SetPerspective(float fov, float aspect, float zNear, float zFar) {
     if (mbFlipY) mMatrices.mPerspective[1][1] *= -1.0f;
 }
 
-void Camera::UpdateAspectRatio(float aspect) {
-
+void Camera::UpdateAspectRatio(float aspect) 
+{
     mMatrices.mPerspective = glm::perspective(glm::radians(mFov), aspect, mZNear, mZFar);
     if (mbFlipY) mMatrices.mPerspective[1][1] *= -1.0f;
 }
 
-void Camera::Update(float deltaTime) {
-
+void Camera::Update(float deltaTime) 
+{
     mbUpdated = false;
     if (mType == FirstPerson)
     {
@@ -39,8 +39,8 @@ void Camera::Update(float deltaTime) {
     updateViewMatrix();
 }
 
-void Camera::updateViewMatrix() {
-
+void Camera::updateViewMatrix() 
+{
     glm::mat4 rotM = glm::mat4(1.0f);
     glm::mat4 transM;
 

@@ -66,7 +66,7 @@ function(RunPython TargetName)
     if (PYTHON_FOUND)
         add_custom_target(${TargetName} ALL
             COMMAND 
-               ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/Assets/Shaders/GLSL/CompileGLSL.py
+               python ${PROJECT_SOURCE_DIR}/Assets/Shaders/GLSL/CompileGLSL.py
         )
     endif()
 endfunction()

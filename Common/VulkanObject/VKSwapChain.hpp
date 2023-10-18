@@ -20,6 +20,16 @@ public:
     VkResult QueuePresent(VkQueue queue, uint32_t imageIndex, VkSemaphore waitSemaphore = VK_NULL_HANDLE);
     void Cleanup();
 
+public:
+    VkFormat                        mFormat;
+    VkColorSpaceKHR                 mColorSpace;
+    VkSwapchainKHR                  mSwapChain = VK_NULL_HANDLE;
+    VkExtent2D                      mExtent;
+    uint32_t                        mImageCount;
+    uint32_t                        mQueueNodeIndex = UINT32_MAX;
+    std::vector<VkImage>            mImages;
+    std::vector<SwapChainBuffer>    mBuffers;
+
 private:
     VkInstance          mInstance;
     VkDevice            mDevice;
@@ -36,14 +46,4 @@ private:
     PFN_vkGetSwapchainImagesKHR                     fpGetSwapchainImagesKHR;
     PFN_vkAcquireNextImageKHR                       fpAcquireNextImageKHR;
     PFN_vkQueuePresentKHR                           fpQueuePresentKHR;
-
-public:
-    VkFormat                        mFormat;
-    VkColorSpaceKHR                 mColorSpace;
-    VkSwapchainKHR                  mSwapChain = VK_NULL_HANDLE;
-    VkExtent2D                      mExtent;
-    uint32_t                        mImageCount;
-    uint32_t                        mQueueNodeIndex = UINT32_MAX;
-    std::vector<VkImage>            mImages;
-    std::vector<SwapChainBuffer>    mBuffers;
 };
