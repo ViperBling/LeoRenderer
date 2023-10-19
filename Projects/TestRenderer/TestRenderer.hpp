@@ -3,7 +3,7 @@
 #include "ProjectPCH.hpp"
 
 #include "VKRendererBase.hpp"
-#include "AssetsLoader.hpp"
+#include "Utilities/AssetsLoader.hpp"
 
 #define ENABLE_VALIDATION true
 #define ENABLE_MSAA true

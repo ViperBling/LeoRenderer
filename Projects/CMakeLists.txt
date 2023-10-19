@@ -27,10 +27,10 @@ function(buildProject PROJECT_NAME)
     file(GLOB README_FILES "${PROJECT_FOLDER}/*.md")
     if(WIN32)
         add_executable(${PROJECT_NAME} WIN32 ${MAIN_CPP} ${SOURCE} ${MAIN_HEADER} ${SHADERS_GLSL} ${SHADERS_HLSL} ${README_FILES})
-        target_link_libraries(${PROJECT_NAME} CommonLib ${Vulkan_LIBRARY} ${WINLIBS})
+        target_link_libraries(${PROJECT_NAME} FrameworkLib ${Vulkan_LIBRARY} ${WINLIBS})
     else(WIN32)
         add_executable(${PROJECT_NAME} ${MAIN_CPP} ${SOURCE} ${MAIN_HEADER} ${SHADERS_GLSL} ${SHADERS_HLSL} ${README_FILES})
-        target_link_libraries(${PROJECT_NAME} CommonLib )
+        target_link_libraries(${PROJECT_NAME} FrameworkLib)
     endif(WIN32)
 
     set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Bin)
@@ -50,7 +50,6 @@ endfunction(buildProjects)
 set(PROJECTS
     TestRenderer
     VulkanRenderer
-    GLTFTest
     )
 
 buildProjects()

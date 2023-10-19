@@ -4,8 +4,11 @@
 
 #include "ProjectPCH.hpp"
 
-#include "CmdLineParser.hpp"
-#include "KeyCodes.hpp"
+#include "Utilities/CmdLineParser.hpp"
+#include "Utilities/KeyCodes.hpp"
+#include "Utilities/Camera.hpp"
+#include "Utilities/Benchmark.hpp"
+
 #include "VKTools.hpp"
 #include "VKDebug.hpp"
 #include "VKUIOverlay.hpp"
@@ -13,10 +16,7 @@
 #include "VKBuffer.hpp"
 #include "VKDevice.hpp"
 #include "VKTexture.hpp"
-
 #include "VKInitializers.hpp"
-#include "Camera.hpp"
-#include "Benchmark.hpp"
 
 
 struct RenderTarget

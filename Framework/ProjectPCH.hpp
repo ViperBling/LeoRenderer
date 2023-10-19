@@ -27,6 +27,7 @@
 #include <ShellScalingApi.h>
 
 #include "vulkan/vulkan.h"
+#include "vulkan/vulkan_win32.h"
 
 #include <ktx.h>
 #include <ktxvulkan.h>

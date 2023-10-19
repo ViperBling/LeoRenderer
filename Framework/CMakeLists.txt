@@ -10,6 +10,6 @@ set(KTX_SOURCES
     ${KTX_DIR}/lib/memstream.c
     ${KTX_DIR}/lib/filestream.c)
 
-add_library(CommonLib STATIC ${BASE_SRC} ${KTX_SOURCES})
+add_library(FrameworkLib STATIC ${BASE_SRC} ${KTX_SOURCES})
 
-target_link_libraries(CommonLib ${Vulkan_LIBRARY} ${WINLIBS})
+target_link_libraries(FrameworkLib ${Vulkan_LIBRARY} ${WINLIBS})
