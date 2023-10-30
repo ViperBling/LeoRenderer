@@ -334,22 +334,22 @@ namespace LeoVK::VKTools
     void ReadDirectory(const std::string &directory, const std::string &pattern, std::map<std::string, std::string> &fileList, bool recursive)
     {
         std::string searchpattern(directory + "/" + pattern);
-        WIN32_FIND_DATA data;
+        WIN32_FIND_DATAA data;
         HANDLE hFind;
-        if ((hFind = FindFirstFile(searchpattern.c_str(), &data)) != INVALID_HANDLE_VALUE) 
+        if ((hFind = FindFirstFileA(searchpattern.c_str(), &data)) != INVALID_HANDLE_VALUE) 
         {
             do 
             {
                 std::string filename(data.cFileName);
                 filename.erase(filename.find_last_of("."), std::string::npos);
                 fileList[filename] = directory + "/" + data.cFileName;
-            } while (FindNextFile(hFind, &data) != 0);
+            } while (FindNextFileA(hFind, &data) != 0);
             FindClose(hFind);
         }
         if (recursive) 
         {
             std::string dirpattern = directory + "/*";
-            if ((hFind = FindFirstFile(dirpattern.c_str(), &data)) != INVALID_HANDLE_VALUE) 
+            if ((hFind = FindFirstFileA(dirpattern.c_str(), &data)) != INVALID_HANDLE_VALUE) 
             {
                 do 
                 {
@@ -364,7 +364,7 @@ namespace LeoVK::VKTools
                             ReadDirectory(subdir, pattern, fileList, recursive);
                         }
                     }
-                } while (FindNextFile(hFind, &data) != 0);
+                } while (FindNextFileA(hFind, &data) != 0);
                 FindClose(hFind);
             }
         }
