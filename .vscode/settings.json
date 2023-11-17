@@ -78,6 +78,8 @@
         "deque": "cpp",
         "ranges": "cpp",
         "span": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "condition_variable": "cpp",
+        "shared_mutex": "cpp"
     }
 }

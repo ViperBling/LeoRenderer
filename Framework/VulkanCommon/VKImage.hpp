@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <array>
+
 #include "VKMemoryAllocator.hpp"
 #include "VKShaderReflection.hpp"
 
@@ -104,4 +109,6 @@ namespace LeoVK
         Format mFormat = Format::UNDEFINED;
         VmaAllocation mAllocation = VK_NULL_HANDLE;
     };
+
+    
 }
