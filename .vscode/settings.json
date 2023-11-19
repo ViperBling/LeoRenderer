@@ -80,6 +80,12 @@
         "span": "cpp",
         "stack": "cpp",
         "condition_variable": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "filesystem": "cpp",
+        "future": "cpp",
+        "queue": "cpp",
+        "random": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp"
     }
 }

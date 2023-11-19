@@ -95,12 +95,12 @@ namespace LeoVK
         static ShaderData LoadFromSource(const std::string& code, ShaderType type, ShaderLanguage language);
     };
 
-    class ModelLader
+    class ModelLoader
     {
     public:
         static ModelData LoadFromObj(const std::string& filePath);
         static ModelData LoadFromGLTF(const std::string& filePath);
-        static ModelData Load(const std::string& filepath);
+        static ModelData Load(const std::string& filePath);
     };
 
 } // namespace LeoVK

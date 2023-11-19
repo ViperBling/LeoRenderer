@@ -56,7 +56,7 @@ namespace LeoVK
         void CopyDataWithFlush(const uint8_t* data, size_t size, size_t offset = 0);
 
     private:
-        void destroy();
+        void Destroy();
         
     private:
         vk::Buffer mBuffer;

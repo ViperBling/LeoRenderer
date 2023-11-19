@@ -89,8 +89,8 @@ namespace LeoVK
         uint32_t GetLayerCount() const { return mLayerCount; }
 
     private:
-        void destroy();
-        void initViews(const vk::Image& image, Format format);
+        void Destroy();
+        void InitViews(const vk::Image& image, Format format);
 
     private:
         struct ImageViews
@@ -110,5 +110,17 @@ namespace LeoVK
         VmaAllocation mAllocation = VK_NULL_HANDLE;
     };
 
-    
+    using ImageReference = std::reference_wrapper<const Image>;
+
+    vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
+    vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits usage);
+    vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits usage);
+    vk::PipelineStageFlags ImageUsageToPipelineStage(ImageUsage::Bits usage);
+
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel, uint32_t layer);
+    vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image);
+
+    uint32_t CalculateImageMipLevelCount(ImageOptions::Value options, uint32_t width, uint32_t height);
+    uint32_t CalculateImageLayerCount(ImageOptions::Value options);
 }
