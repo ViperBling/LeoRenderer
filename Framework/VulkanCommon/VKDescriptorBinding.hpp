@@ -41,22 +41,26 @@ namespace LeoVK
     class DescriptorBinding
     {
     public:
+		// 绑定Buffer
 		DescriptorBinding& Bind(uint32_t binding, const std::string& name, UniformType type);
+		// 绑定Image
 		DescriptorBinding& Bind(uint32_t binding, const std::string& name, UniformType type, ImageView view);
 		DescriptorBinding& Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type, ImageView view);
 
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
 
-		void SetOptions(ResolveOptions options) { this->options = options; }
+		void SetOptions(ResolveOptions options) { this->mOptions = options; }
 
+		// 根据Resolve信息生成WriteDesc
 		void Resolve(const ResolveInfo& resolveInfo);
-
+		// 上传已经写入WriteDesc的信息
 		void Write(const vk::DescriptorSet& descriptorSet);
 		const auto& GetBoundBuffers() const { return this->mBufferToResolve; }
 		const auto& GetBoundImages() const { return this->mImageToResolve; }
 
     private:
+		// 向对应的Resolve信息数组中加入信息，并返回索引
         size_t AllocateBinding(const Buffer& buffer, UniformType type);
 		size_t AllocateBinding(const Image& image, ImageView view, UniformType type);
 		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view, UniformType type);
@@ -117,6 +121,6 @@ namespace LeoVK
 		std::vector<ImageToResolve> mImageToResolve;
 		std::vector<SamplerToResolve> mSamplerToResolve;
 
-		ResolveOptions options = ResolveOptions::RESOLVE_EACH_FRAME;
+		ResolveOptions mOptions = ResolveOptions::RESOLVE_EACH_FRAME;
     };
 }

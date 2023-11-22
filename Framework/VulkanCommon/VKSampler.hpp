@@ -38,7 +38,7 @@ namespace LeoVK
         void Destroy();
 
     private:
-        vk::Sampler handle;
+        vk::Sampler mSampler;
     };
 
     using SamplerReference = std::reference_wrapper<const Sampler>;

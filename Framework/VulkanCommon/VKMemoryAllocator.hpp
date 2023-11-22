@@ -3,9 +3,6 @@
 #include <cstdint>
 #include <cstddef>
 
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vk_mem_alloc.h>
-
 struct VmaAllocator_T;
 struct VmaAllocation_T;
 using VmaAllocator = VmaAllocator_T*;
@@ -13,6 +10,8 @@ using VmaAllocation = VmaAllocation_T*;
 
 namespace LeoVK
 {
+    class VulkanContext;
+
     enum class MemoryUsage
     {
         GPU_ONLY = 0,           // device local for fast GPU access

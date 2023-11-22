@@ -23,12 +23,12 @@ namespace LeoVK
     
     private:
         vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<const ShaderUniforms> specification);
-        vk::DescriptorSet vkAllocateDescriptorSet(vk::DescriptorSetLayout layout);
+        vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout);
         void DestroyDescriptorSetLayout(vk::DescriptorSetLayout layout);
         void FreeDescriptorSet(vk::DescriptorSet set);
 
     private:
         vk::DescriptorPool mDescPool;
-        std::vector<Descriptor> mDescSets;
+        std::vector<Descriptor> mDescriptor;
     };
 }

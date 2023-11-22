@@ -65,5 +65,5 @@ namespace LeoVK
         uint8_t* mpMapped = nullptr;
     };
 
-    using BufferReference = std::reference_wrapper<Buffer>;
+    using BufferReference = std::reference_wrapper<const Buffer>;
 }
