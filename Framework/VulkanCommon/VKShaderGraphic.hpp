@@ -28,9 +28,9 @@ namespace LeoVK
         void Destroy();
 
     private:
-        vk::ShaderModule vertexShader;
-        vk::ShaderModule fragmentShader;
-        std::vector<ShaderUniforms> shaderUniforms;
-        std::vector<TypeSPIRV> inputAttributes;
+        vk::ShaderModule mVertexShader;
+        vk::ShaderModule mPixelShader;
+        std::vector<ShaderUniforms> mShaderUniforms;
+        std::vector<TypeSPIRV> mInputAttributes;
     };
 }

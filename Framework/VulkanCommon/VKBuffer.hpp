@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VKMemoryAllocator.hpp"
+#include <vulkan/vulkan.hpp>
 
 namespace LeoVK
 {
