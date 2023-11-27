@@ -11,7 +11,7 @@ namespace LeoVK
         DISCARD_COLOR = 0,
         DISCARD_DEPTH_SPENCIL,
         LOAD_COLOR,
-        LOAD_DEPTH_SPENCIL,
+        LOAD_DEPTH_STENCIL,
         CLEAR_COLOR,
         CLEAR_DEPTH_SPENCIL,
     };

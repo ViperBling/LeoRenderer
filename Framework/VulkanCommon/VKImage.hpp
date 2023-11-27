@@ -23,7 +23,7 @@ namespace LeoVK
             SHADER_READ                      = (Value)vk::ImageUsageFlagBits::eSampled,
             STORAGE                          = (Value)vk::ImageUsageFlagBits::eStorage,
             COLOR_ATTACHMENT                 = (Value)vk::ImageUsageFlagBits::eColorAttachment,
-            DEPTH_SPENCIL_ATTACHMENT         = (Value)vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            DEPTH_STENCIL_ATTACHMENT         = (Value)vk::ImageUsageFlagBits::eDepthStencilAttachment,
             INPUT_ATTACHMENT                 = (Value)vk::ImageUsageFlagBits::eInputAttachment,
             FRAGMENT_SHADING_RATE_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR,
         };
