@@ -20,7 +20,7 @@ namespace LeoVK
         }
         virtual void OnRender(RenderPassState state) override
         {
-            ImGuiContext::RenderFrame(state.CommandBuffer.GetNativeCmdBuffer());
+            ImGuiVulkanContext::RenderFrame(state.CommandBuffer.GetNativeCmdBuffer());
         }
 
     private:

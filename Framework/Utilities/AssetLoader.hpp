@@ -7,6 +7,7 @@
 #include <array>
 
 #include <assimp/Importer.hpp>
+#include <vulkan/vulkan.hpp>
 
 #include "VulkanCommon/VKShaderReflection.hpp"
 #include "VectorMath.hpp"

@@ -10,7 +10,7 @@ namespace LeoVK
     class Image;
     class RenderPass;
 
-    class ImGuiContext
+    class ImGuiVulkanContext
     {
     public:
         static void Init(const Window& window, const vk::RenderPass& renderPass);

@@ -8,7 +8,7 @@
 
 namespace LeoVK
 {
-    void ImGuiContext::Init(const Window &window, const vk::RenderPass &renderPass)
+    void ImGuiVulkanContext::Init(const Window &window, const vk::RenderPass &renderPass)
     {
         auto& vulkan = GetCurrentVulkanContext();
 
@@ -37,7 +37,7 @@ namespace LeoVK
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
-    void ImGuiContext::Destroy()
+    void ImGuiVulkanContext::Destroy()
     {
         GetCurrentVulkanContext().GetDevice().waitIdle();
 
@@ -45,31 +45,31 @@ namespace LeoVK
         ImGui_ImplGlfw_Shutdown();
     }
 
-    void ImGuiContext::StartFrame()
+    void ImGuiVulkanContext::StartFrame()
     {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
     }
 
-    void ImGuiContext::RenderFrame(const vk::CommandBuffer &commandBuffer)
+    void ImGuiVulkanContext::RenderFrame(const vk::CommandBuffer &commandBuffer)
     {
         ImGui::Render();
         ImDrawData* drawData = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
     }
 
-    ImTextureID ImGuiContext::GetTextureId(const Image &image)
+    ImTextureID ImGuiVulkanContext::GetTextureId(const Image &image)
     {
         return (ImTextureID)image.GetNativeView(ImageView::NATIVE);
     }
 
-    ImTextureID ImGuiContext::GetTextureId(const vk::ImageView &view)
+    ImTextureID ImGuiVulkanContext::GetTextureId(const vk::ImageView &view)
     {
         return (ImTextureID)view;
     }
 
-    void ImGuiContext::EndFrame()
+    void ImGuiVulkanContext::EndFrame()
     {
         ImGui::EndFrame();
     }

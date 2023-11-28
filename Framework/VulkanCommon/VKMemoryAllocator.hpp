@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstddef>
 
+#include <vulkan/vulkan.hpp>
+
 struct VmaAllocator_T;
 struct VmaAllocation_T;
 using VmaAllocator = VmaAllocator_T*;

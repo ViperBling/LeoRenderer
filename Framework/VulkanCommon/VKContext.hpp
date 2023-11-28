@@ -18,7 +18,7 @@ namespace LeoVK
     struct VulkanContextCreateOptions
     {
         int APIMajorVersion = 1;
-        int APIMinorVersion = 1;
+        int APIMinorVersion = 3;
         std::function<void(const std::string&)> ErrorCallback = DefaultVulkanContextCallback;
         std::function<void(const std::string&)> InfoCallback = DefaultVulkanContextCallback;
         std::vector<const char*> Extensions;

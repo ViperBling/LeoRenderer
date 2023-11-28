@@ -125,9 +125,9 @@ namespace LeoVK
     {
         vk::ApplicationInfo appInfo;
         appInfo.pApplicationName = options.ApplicationName;
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 1, 0);
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 3, 0);
         appInfo.pEngineName = options.EngineName;
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 1, 0);
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 3, 0);
         appInfo.apiVersion = VK_MAKE_VERSION(options.APIMajorVersion, options.APIMinorVersion, 0);
         
         auto extensions = options.Extensions;
