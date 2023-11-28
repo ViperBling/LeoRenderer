@@ -83,7 +83,7 @@ namespace LeoVK
 
         std::shared_ptr<Shader> mShader;
         std::vector<VertexBinding> mVertexBindings;
-        std::vector<DescriptorBinding> mDescBindings;
+        DescriptorBinding mDescBindings;
 
     private:
         std::vector<BufferDependency> mBufferDependencies;
