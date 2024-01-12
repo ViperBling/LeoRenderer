@@ -295,7 +295,7 @@ namespace LeoVK
             return vk::ImageLayout::eUndefined;
         case LeoVK::ImageUsage::TRANSFER_SOURCE:
             return vk::ImageLayout::eTransferSrcOptimal;
-        case LeoVK::ImageUsage::TRANSFER_DISTINATION:
+        case LeoVK::ImageUsage::TRANSFER_DESTINATION:
             return vk::ImageLayout::eTransferDstOptimal;
         case LeoVK::ImageUsage::SHADER_READ:
             return vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -303,7 +303,7 @@ namespace LeoVK
             return vk::ImageLayout::eGeneral;
         case LeoVK::ImageUsage::COLOR_ATTACHMENT:
             return vk::ImageLayout::eColorAttachmentOptimal;
-        case LeoVK::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+        case LeoVK::ImageUsage::DEPTH_STENCIL_ATTACHMENT:
             return vk::ImageLayout::eDepthStencilAttachmentOptimal;
         case LeoVK::ImageUsage::INPUT_ATTACHMENT:
             return vk::ImageLayout::eAttachmentOptimalKHR; // TODO: is it ok?
@@ -323,7 +323,7 @@ namespace LeoVK
             return vk::AccessFlags{ };
         case ImageUsage::TRANSFER_SOURCE:
             return vk::AccessFlagBits::eTransferRead;
-        case ImageUsage::TRANSFER_DISTINATION:
+        case ImageUsage::TRANSFER_DESTINATION:
             return vk::AccessFlagBits::eTransferWrite;
         case ImageUsage::SHADER_READ:
             return vk::AccessFlagBits::eShaderRead;
@@ -331,7 +331,7 @@ namespace LeoVK
             return vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite; // TODO: what if storage is not read or write?
         case ImageUsage::COLOR_ATTACHMENT:
             return vk::AccessFlagBits::eColorAttachmentWrite;
-        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+        case ImageUsage::DEPTH_STENCIL_ATTACHMENT:
             return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
         case ImageUsage::INPUT_ATTACHMENT:
             return vk::AccessFlagBits::eInputAttachmentRead;
@@ -351,7 +351,7 @@ namespace LeoVK
             return vk::PipelineStageFlagBits::eTopOfPipe;
         case ImageUsage::TRANSFER_SOURCE:
             return vk::PipelineStageFlagBits::eTransfer;
-        case ImageUsage::TRANSFER_DISTINATION:
+        case ImageUsage::TRANSFER_DESTINATION:
             return vk::PipelineStageFlagBits::eTransfer;
         case ImageUsage::SHADER_READ:
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
@@ -359,7 +359,7 @@ namespace LeoVK
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
         case ImageUsage::COLOR_ATTACHMENT:
             return vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+        case ImageUsage::DEPTH_STENCIL_ATTACHMENT:
             return vk::PipelineStageFlagBits::eEarlyFragmentTests; // TODO: whats for late fragment test?
         case ImageUsage::INPUT_ATTACHMENT:
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: check if at least works

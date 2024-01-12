@@ -183,7 +183,7 @@ namespace LeoVK
         toTransDstBarrier.subresourceRange = distRange;
 
         if (source.Usage != ImageUsage::TRANSFER_SOURCE) barriers[barrierCount++] = toTransSrcBarrier;
-        if (dest.Usage != ImageUsage::TRANSFER_DISTINATION) barriers[barrierCount++] = toTransDstBarrier;
+        if (dest.Usage != ImageUsage::TRANSFER_DESTINATION) barriers[barrierCount++] = toTransDstBarrier;
 
         if (barrierCount > 0)
         {
@@ -237,7 +237,7 @@ namespace LeoVK
 
     void CommandBuffer::CopyBufferToImage(const BufferInfo &source, const ImageInfo &dest)
     {
-        if (dest.Usage != ImageUsage::TRANSFER_DISTINATION)
+        if (dest.Usage != ImageUsage::TRANSFER_DESTINATION)
         {
             auto destRange = GetDefaultImageSubresourceRange(dest.Resource.get());
 
@@ -365,7 +365,7 @@ namespace LeoVK
 
         if (sourceUsage != ImageUsage::TRANSFER_SOURCE)
             barriers[barrierCount++] = toTransferSrcBarrier;
-        if (destUsage != ImageUsage::TRANSFER_DISTINATION)
+        if (destUsage != ImageUsage::TRANSFER_DESTINATION)
             barriers[barrierCount++] = toTransferDstBarrier;
 
         if (barrierCount > 0)
@@ -448,9 +448,9 @@ namespace LeoVK
 
             imageBarriers[1] // to transfer distance
                 .setSrcAccessMask(ImageUsageToAccessFlags(ImageUsage::UNKNOWN))
-                .setDstAccessMask(ImageUsageToAccessFlags(ImageUsage::TRANSFER_DISTINATION))
+                .setDstAccessMask(ImageUsageToAccessFlags(ImageUsage::TRANSFER_DESTINATION))
                 .setOldLayout(ImageUsageToImageLayout(ImageUsage::UNKNOWN))
-                .setNewLayout(ImageUsageToImageLayout(ImageUsage::TRANSFER_DISTINATION))
+                .setNewLayout(ImageUsageToImageLayout(ImageUsage::TRANSFER_DESTINATION))
                 .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setImage(image.GetNativeImage())
@@ -464,7 +464,7 @@ namespace LeoVK
                 { }, // buffer barriers,
                 imageBarriers
             );
-            srcUsage = ImageUsage::TRANSFER_DISTINATION;
+            srcUsage = ImageUsage::TRANSFER_DESTINATION;
 
             vk::ImageBlit imageBlitInfo;
             imageBlitInfo
